@@ -1,0 +1,60 @@
+# Golf game goal prompt
+
+Build a complete, playable browser-based 3D golf game inspired by the approachable feel of Wii Sports Golf, using original characters, courses, branding, and audio. Work in this repository. Treat the visual concepts as design references, not evidence of implemented functionality.
+
+## Selected design direction
+
+Use A — Sunny Resort's bright coastal course: lush fairways, turquoise water, light sand, and inviting sunlight. Use C — Arcade Links' sporty human golfer as the starting point for characters. Support the refined styles 1 (Relaxed Athletic) and 3 (Sharp Sport) within one cohesive athletic character system; allow users to choose softer or sharper facial treatments while retaining adult sporty proportions. Do not use style 2's more childlike proportions. Provide diverse, fully editable presets.
+
+Keep gameplay metrics in one compact bar along the very top. Use an opaque navy background, readable white labels, and large white or pale-yellow values. Show hole, par, stroke, distance to pin, and wind; avoid an oversized logo or decorative slogans in the gameplay view. Use B — Cozy Club's compact cream club selector in the lower-left corner: club silhouette, short code such as 1W, readable name such as Driver, and previous/next arrows. Also support Q/E. Avoid the previous design's large multi-button club tray. Retain the full character creator and other menus as separate screens.
+
+Use the provided Wii Golf screenshots as functional references for minimap-only aiming and range feedback, preserving A's modern sunny resort aesthetic. Keep the central course view clear of prediction graphics. Show revised static gameplay and character-customization mockups as separate screens. Create original art and interface elements.
+
+## Game scope
+
+Create a casual, forgiving golf game with a tutorial, practice range, a complete nine-hole course, solo play, and local turn-based play for two to four people. Players may choose their own input mode. Online multiplayer and accounts are outside the initial scope.
+
+Implement aiming, club selection, driving, approach shots, chipping, putting, wind, slopes, terrain-dependent bounce and roll, bunkers, water, out-of-bounds penalties, hole completion, stroke counting, scorecards, and round results. Include driver, fairway wood, irons, wedge, and putter with visibly different behavior. Prioritize consistent and enjoyable arcade physics.
+
+## Aiming, minimap, and power
+
+Allow the player to rotate shot direction with A/D, arrow keys, or visible controls. Display all shot predictions ONLY inside the minimap: aiming line, range dots, predicted landing marker, optional uncertainty area, and a visually distinct roll extension. Keep the central 3D course free of trajectory arcs, aiming lines, landing circles, projected balls, and floating distance/carry labels. The normal golfer, ball, physical flag and scenery remain visible. Distance-to-pin may remain in the top metrics bar; predicted shot distance belongs in the minimap. Update the prediction when aim, club, planned power, wind, or lie changes. For putting, predict the ground path inside the minimap. Use the same simulation rules for predictions and actual shots, and label predictions as estimates.
+
+Allow camera orbit independently of shot direction, using a separate drag action, plus a reset-to-shot-view button. Orbiting the view must not silently change aim or fire a shot. Distinguish orbit, aiming, and power gestures in the control hints.
+
+Show a readable minimap of the current hole with the ball, flag, hazards, aim line, distance ticks, predicted landing marker, and estimated stopping point. Use a cyan player/aim triangle, a clear blue direction line with white range dots, and a contrasting gold diamond for the predicted landing position, inspired by the supplied reference. Keep terrain shapes legible and geographically faithful to the actual course. Link the marker's distance to the power meter so increasing or decreasing power moves the prediction along the chosen direction. Range dots should represent sampled power levels for the selected club, with a compact legend or accessible explanation. Show estimated carry and total distance separately within the minimap panel. Keep these markers synchronized with the actual shot direction and club selection. Changing clubs must update the available range immediately. Do not duplicate the prediction in the main course view.
+
+Keep the power fill, needle, and all active effects within a fixed rectangular meter at all times. Proposed tuning: the scale runs from 0% to 120%, with 100% marking normal full power and the final 100–120% segment visibly labeled OVERHIT. The overhit segment is part of the same box, marked with hatching and a label as well as an amber/orange color. Never draw overflow beyond the frame. Clamp input at 120% instead of allowing an unbounded charge or wraparound.
+
+Allow too much power in two understandable ways: a shot can overshoot the intended target even within the normal range, and deliberately entering OVERHIT provides modest extra distance with a progressively wider accuracy spread. Show this widening in the minimap's predicted landing area. Keep penalties forgiving and predictable in magnitude for casual play. The 120% cap and exact distance/accuracy tuning are proposed defaults to validate during playtesting.
+
+Both input modes must feed the same bounded power model. In camera mode, show the selected target power or a clearly labeled practice-swing estimate before the live swing, then show measured power after it; do not imply the system knows the strength of an upcoming swing. Calibration should make normal full swings comfortable, with stronger gestures saturating at the overhit cap. Aim and club remain adjustable before swinging.
+
+## Two input modes
+
+1. Keyboard and mouse: A/D or arrow keys to aim, Q/E or a visible selector to change clubs, mouse hold/release on the swing control to set shot power, and an optional timing action for accuracy. Let players adjust planned power before charging so they can inspect the range preview. Use a separate drag action over the course to orbit the camera. Offer a fully keyboard-accessible equivalent, visible control hints, and practice shots.
+2. Camera Swing: support a built-in laptop camera or USB webcam using MediaPipe Pose Landmarker or a justified equivalent. After the player enables the camera, offer device selection, a mirrored preview, framing guidance, handedness selection, calibration, sensitivity adjustment, and practice swings. Estimate shot power from calibrated wrist/arm motion and timing. Use explicit swing phases, confidence thresholds, and a cooldown so one intentional swing causes one shot. Do not claim to measure real clubhead speed, face angle, or ball spin from a single webcam. Keep aim and club selection accessible through keyboard/mouse initially and explain this in the interface.
+
+Run camera processing locally without recording or uploading frames. Keep game rendering responsive during inference. Handle camera denial, unavailable devices, model-loading failure, and low-confidence tracking with clear recovery actions. Block accidental shots when tracking is lost; allow retry, recalibration, or switching input modes without losing the round. Stop camera capture when camera mode is disabled or the game is exited. Support a comfortable reduced-motion gesture where feasible and make framing requirements explicit.
+
+## Customizable characters
+
+Create original stylized 3D human avatars with editable name, skin tone, hairstyle and color, face options, body proportions, clothing colors, hats, and accessories. Show a live rotatable preview and save multiple local profiles. Use the selected avatar in gameplay, swing animations, scorecards, and celebrations. Avatar appearance must not alter shot performance.
+
+Use B — Cozy Club's friendly customization layout: a large rotatable avatar preview, clear labeled rows of face/hair thumbnails, skin-tone swatches, outfit options, colors, and headwear. Pair cream surfaces and readable navy text with the athletic visual language of styles 1 and 3. Favor performance polos, technical tops, golf shorts, trousers, skorts, sneakers, caps and visors. Offer relaxed and sharp facial treatments as appearance choices, not different gameplay classes. Keep all appearance options available independently of gender or preset.
+
+Provide at least six distinct starter presets spanning varied skin tones, genders and gender expression, hair textures, facial features and athletic body builds. Proposed initial roster: Maya, a Black woman with tied textured curls and a teal polo; Kai, an East Asian man with a textured crop and cream polo; Amir, a brown-skinned man with curls, a neat beard and a coral polo; Zoe, a fair freckled woman with a red ponytail and navy technical top; Leo, a dark-skinned golfer with a stockier athletic build, short twists and a cobalt polo; and Val, an androgynous tan golfer with a wavy undercut and sage top. Names, appearance, clothes and accessories are fully editable starting points. Presets must differ in silhouette and features as well as color. Applying or editing a preset must update the avatar consistently throughout the game.
+
+## Full interface
+
+Implement a cohesive title screen, player setup, character creator, control-mode selection, camera setup, tutorial, course/hole selection, gameplay HUD, pause menu, settings, scorecard, and results screen. The HUD should show current player, hole/par, stroke count, distance, club, wind, aim, power, minimap, and tracking state when relevant. Include loading states, useful error states, sound/music controls, graphics options, readable contrast, visible focus, reduced motion, and responsive desktop/laptop layouts. Every displayed button must work.
+
+Save characters, preferences, best scores, and resumable round progress locally. Provide restart, replay, and return-to-menu flows. Add original or appropriately licensed ambient audio, shot sounds, ball sounds, and restrained celebration effects.
+
+## Delivery and verification
+
+Choose a maintainable web stack appropriate for 3D rendering and browser pose tracking, and document how to run it. Build in milestones: approved visual direction; one complete playable hole with keyboard/mouse and an avatar; working camera calibration and swing detection; full course and menus; polish and verification. The one-hole milestone is not the final deliverable.
+
+Separate golf simulation, input interpretation, rendering, and UI state so both control modes feed the same shot system. Verify scoring, penalties, hole completion, turn order, local saves, and complete-round progression with appropriate automated checks. Verify power stays clamped, meter graphics stay inside their frame at maximum power, and overhit changes range and accuracy as specified. Check that aim rotation, club changes, and power adjustments keep the minimap prediction synchronized with the shot simulation. Verify prediction graphics and predicted-distance labels appear only in the minimap and never over the central course. Check that camera orbit preserves aim. Verify all presets are selectable, editable, persist correctly and appear consistently in gameplay. Exercise the menus and play loop in a browser. Test camera-denied and tracking-loss flows. Use recorded landmark fixtures to check gesture interpretation, but clearly distinguish those checks from real-camera verification.
+
+Completion means a player can create and save a character, select either control mode, finish a nine-hole round, view accurate results, and replay without broken navigation. Verify real camera swings on supported hardware when available; explicitly report any hardware-dependent behavior that remains unverified. Provide run instructions, validation results, and remaining limitations. Target smooth play on a typical laptop with adjustable quality; report measured performance and test hardware instead of making unsupported performance claims.
