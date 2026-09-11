@@ -67,4 +67,4 @@ Files: index.html, src/main.js, src/ui/screens.js, src/ui/minimap.js, src/ui/sty
 - [x] Run Playwright browser navigation and full-round checks against actual app state, inspect screenshots at desktop and smaller laptop widths.
 - [x] Review code and audit every spec requirement. Fix material gaps before claiming completion.
 - [x] Document run instructions, measured performance/browser environment and hardware-dependent camera limitations.
-- [ ] Commit and push to user-provided origin; keep scope active until the complete implementation and verification are done.
+- [x] Commit and push to user-provided origin; keep scope active until the complete implementation and verification are done.

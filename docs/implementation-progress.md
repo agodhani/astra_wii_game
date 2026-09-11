@@ -19,4 +19,4 @@ See [verification record](verification/README.md) and [review fixes](review-fixe
 
 ## Git delivery
 
-Origin is `git@github.com:agodhani/astra_wii_game.git`, branch `main`. The design commit is `bb12d98`. The complete implementation is verified and ready for commit and push. SSH reports no loaded identities and GitHub currently rejects access with `Permission denied (publickey)`; authentication must be available for the push to succeed.
+The verified implementation commit `43f617f` was pushed to `main` in `agodhani/astra_wii_game` on 2026-09-11. GitHub SSH authentication is working, and local `main` tracks `origin/main`. The 31 unit tests and production build passed again immediately before the successful push. Physical webcam testing remains deferred to the user's other computer.
