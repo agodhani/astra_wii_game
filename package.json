@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/prepare-assets.js",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test --test-isolation=none tests/*.test.js",
     "test:browser": "playwright test"
   },
   "dependencies": {
@@ -16,6 +17,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
-    "vite": "7.3.1"
+    "vite": "7.3.6"
   }
 }
