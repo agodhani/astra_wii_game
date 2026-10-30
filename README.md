@@ -78,7 +78,7 @@ npm run build
 
 Browser tests build and serve production assets on port 4173. They use Chromium's software graphics backend for reproducible headless execution. See [verification notes](docs/verification/README.md) for the current evidence and known limits.
 
-The renderer uses original procedural 3D geometry rather than the detailed raster concept art. It provides graphics quality and reduced-motion settings. Software SwiftShader measured about 8.6 FPS at 1440×1000 in an earlier renderer-only sample; this is not a hardware GPU performance measurement. Smooth performance on the target laptop remains to be measured.
+The renderer uses original procedural 3D geometry rather than the detailed raster concept art. It provides graphics quality and reduced-motion settings. The default **Auto** quality measures the frame rate every second: below 45 FPS it lowers render resolution (down to 0.5×); after three seconds above 57 FPS it raises it again, up to 1.5× on high-DPI screens. `window.__golfPerf` reports the current FPS and render scale. Software SwiftShader measured about 8.6 FPS at 1440×1000 in an earlier renderer-only sample; this is not a hardware GPU performance measurement. Smooth performance on the target laptop remains to be measured.
 
 ## Project structure
 
