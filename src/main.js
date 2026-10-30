@@ -293,13 +293,14 @@ for(const name of ['exit','menu']){
  actions[name]=()=>{if(net&&round?.online){net.lobby.close();net=null;}local();};
 }
 // Copy only known profile fields from a peer, with a local id, so nothing unvalidated reaches rendering.
+const guestName=raw=>String(raw?.name??'').replace(/[\u0000-\u001f\u007f-\u009f]/g,'').trim().slice(0,24)||'Guest';
 function guestProfile(raw,seat){
  const base=PRESETS[seat%PRESETS.length],picked=Object.fromEntries(Object.keys(base).map(k=>[k,raw?.[k]]));
- picked.id=`guest-${seat}`;
- return validProfile(picked)?picked:{...base,id:`guest-${seat}`,name:String(raw?.name||'Guest').slice(0,24)||'Guest'};
+ picked.id=`guest-${seat}`;picked.name=guestName(raw);
+ return validProfile(picked)?picked:{...base,id:`guest-${seat}`,name:guestName(raw)};
 }
 function myProfile(){return data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0];}
-function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>String(g.profile?.name||'Guest').slice(0,24))];}
+function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>guestName(g.profile))];}
 function netError(message){
  if(net?.role==='guest'&&round?.online&&screen==='game'){net.lobby.close();net=null;announce(message,'You can finish the round on this device.','bad');return;}
  netUi={...netUi,mode:netUi.mode==='busy'?'choose':netUi.mode,error:message};if(screen!=='game'||overlay==='online'){overlay='online';render();}else announce(message,'','bad');
