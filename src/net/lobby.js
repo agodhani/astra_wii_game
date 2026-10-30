@@ -35,7 +35,7 @@ export class Lobby{
    const guest=this.guests.find(g=>g.conn===conn);
    if(m.t==='hello'){
     if(guest)return;
-    const key=String(m.device||conn.peer).slice(0,64);
+    const key=typeof m.device==='string'&&/^[\w-]{8,64}$/.test(m.device)?m.device:conn.peer;
     if(this.banned.has(key)){conn.send({t:'kicked'});return;}
     if(this.locked||this.guests.filter(g=>!g.gone).length>=MAX_GUESTS){conn.send({t:'full'});return;}
     this.guests.push({conn,key,profile:m.profile,gone:false});this.onPeers();return;

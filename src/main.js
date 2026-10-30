@@ -300,10 +300,11 @@ function guestProfile(raw,seat){
  picked.id=`guest-${seat}`;picked.name=guestName(raw);
  return validProfile(picked)?picked:{...base,id:`guest-${seat}`,name:guestName(raw)};
 }
+let sessionDevice=null;
 function deviceId(){
- let id=localStorage.getItem('blue-bay-golf-device');
- if(!id){id=crypto.randomUUID?.()||Math.random().toString(36).slice(2);localStorage.setItem('blue-bay-golf-device',id);}
- return id;
+ const fresh=()=>sessionDevice??=crypto.randomUUID?.()||Math.random().toString(36).slice(2,14);
+ try{let id=localStorage.getItem('blue-bay-golf-device');if(!id){id=fresh();localStorage.setItem('blue-bay-golf-device',id);}return id;}
+ catch{return fresh();}
 }
 function myProfile(){return data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0];}
 function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>guestName(g.profile))];}
