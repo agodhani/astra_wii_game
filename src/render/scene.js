@@ -6,7 +6,7 @@ import { terrainHeight } from '../game/courses.js';
 const clamp=THREE.MathUtils.clamp;
 export class GolfScene {
  constructor(canvas,{onError}={}){
-  this.canvas=canvas;this.onError=onError;this.time=0;this.mode='menu';this.quality='high';this.reducedMotion=false;this.aim=0;this.orbitYaw=0;this.orbitPitch=0;this.avatarYaw=0;this.ballPoint={x:0,z:0};this.shot=null;this.celebration=0;this.disposed=false;
+  this.canvas=canvas;this.onError=onError;this.time=0;this.mode='menu';this.quality='auto';this.renderScale=null;this.gov={t:0,n:0,good:0};this.perf={fps:0,scale:1};this.reducedMotion=false;this.aim=0;this.orbitYaw=0;this.orbitPitch=0;this.avatarYaw=0;this.ballPoint={x:0,z:0};this.shot=null;this.celebration=0;this.disposed=false;
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog('#b4dfe8',550,2000);
   this.camera=new THREE.PerspectiveCamera(49,1,.1,4000);this.camera.position.set(0,16,-25);
   this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
@@ -67,8 +67,8 @@ export class GolfScene {
   if(this.avatar)this.avatar.visible=mode!=='menu';this.resize();
  }
  setQuality(quality){
-  this.quality=['low','medium','high'].includes(quality)?quality:'high';
-  this.renderer.shadowMap.enabled=this.quality!=='low';
+  this.quality=['auto','low','medium','high'].includes(quality)?quality:'auto';
+  this.renderScale=null;this.gov={t:0,n:0,good:0};this.setShadows(this.quality!=='low');
   const size=this.quality==='high'?2048:1024;this.sun.shadow.mapSize.set(size,size);
   if(this.sun.shadow.map){this.sun.shadow.map.dispose();this.sun.shadow.map=null;}
   this.resize();
@@ -102,12 +102,34 @@ export class GolfScene {
   if(this.landingRing){this.landingRing.visible=false;this.ringAge=0;}
  }
  celebrate(){this.celebration=2.6;}
+ pixelRatio(){
+  const dpr=window.devicePixelRatio||1;
+  if(this.quality==='auto')return this.renderScale??Math.min(dpr,1.5);
+  return Math.min(dpr,this.quality==='low'?1:this.quality==='medium'?1.25:1.75);
+ }
+ setShadows(on){
+  if(this.renderer.shadowMap.enabled===on)return;
+  this.renderer.shadowMap.enabled=on;
+  this.scene.traverse(o=>{for(const m of [].concat(o.material||[]))m.needsUpdate=true;});
+ }
+ // Auto quality: every second, trade render resolution for frame rate and win it back with headroom. Shadows stay put: toggling them recompiles every shader.
+ govern(dt){
+  if(this.quality!=='auto'||!(dt>0)||dt>3)return;
+  const g=this.gov;g.t+=dt;g.n++;
+  if(g.t<1)return;
+  const fps=g.n/g.t,max=Math.min(window.devicePixelRatio||1,1.5),min=.5;g.t=0;g.n=0;
+  let scale=this.renderScale??max;
+  if(fps<45){g.good=0;scale=Math.max(min,scale*clamp(fps/55,.6,.9));}
+  else if(fps>57){if(++g.good>=3){g.good=0;scale=Math.min(max,scale*1.15);}}
+  else g.good=0;
+  this.perf.fps=Math.round(fps);
+  if(scale!==this.renderScale){this.renderScale=scale;this.perf.scale=+scale.toFixed(2);this.resize();}
+ }
  resize(){
   if(this.disposed)return;
   const rect=this.canvas.getBoundingClientRect();const width=Math.max(1,rect.width||this.canvas.clientWidth||window.innerWidth),height=Math.max(1,rect.height||this.canvas.clientHeight||window.innerHeight);
   this.width=width;this.height=height;
-  const cap=this.quality==='low'?1:this.quality==='medium'?1.25:1.75;
-  this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,cap));this.renderer.setSize(width,height,false);
+  this.renderer.setPixelRatio(this.pixelRatio());this.renderer.setSize(width,height,false);
   this.camera.aspect=width/height;this.camera.clearViewOffset();
   // Full-screen canvas is shared by the cream editor; keep the model in its left preview pane.
   if(this.mode==='avatar'&&width>760)this.camera.setViewOffset(width,height,width*.27,0,width,height);
@@ -116,7 +138,7 @@ export class GolfScene {
  update(dt){
   if(this.disposed||!this.hole)return;
   // Shots run on wall-clock time so a slow frame rate never stretches a shot; scenery keeps a small step.
-  const realDt=clamp(Number(dt)||0,0,.5);
+  const rawDt=Number(dt)||0,realDt=clamp(rawDt,0,.5);
   dt=Math.min(realDt,.08);this.time+=dt;
   this.environment?.userData.animate?.(this.time,this.reducedMotion);
   this.celebration=Math.max(0,this.celebration-dt);
@@ -159,7 +181,7 @@ export class GolfScene {
   if(this.tracer&&!this.shot)this.tracerMaterial.opacity=Math.max(.35,this.tracerMaterial.opacity-realDt*.6);
   if(this.celebration>0){kind='celebration';animationTime=2.6-this.celebration;}
   if(this.avatar){this.avatar.visible=this.mode!=='menu';this.avatar.userData.animate(this.reducedMotion&&kind==='idle'?0:animationTime,kind);}
-  this.updateCamera(dt);
+  this.updateCamera(dt);this.govern(rawDt);
   this.renderer.render(this.scene,this.camera);
  }
  updateCamera(dt){

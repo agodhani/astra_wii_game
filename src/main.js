@@ -252,7 +252,7 @@ document.addEventListener('keydown',event=>{
 });
 
 try{
- scene=new GolfScene(canvas,{onError:toast});scene.setHole(HOLES[0]);activeSceneHole=0;scene.setPlayer(data.profiles[0]);scene.setMode('menu');scene.setQuality(data.settings.quality);scene.setReducedMotion(data.settings.reducedMotion);
+ scene=new GolfScene(canvas,{onError:toast});scene.setHole(HOLES[0]);activeSceneHole=0;scene.setPlayer(data.profiles[0]);scene.setMode('menu');scene.setQuality(data.settings.quality);scene.setReducedMotion(data.settings.reducedMotion);window.__golfPerf=scene.perf;
  render();document.querySelector('#loading').remove();
  let last=performance.now(),lastPreview=0;
  function frame(now){const dt=(now-last)/1000;last=now;
