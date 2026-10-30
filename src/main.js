@@ -312,6 +312,10 @@ function netError(message){
  if(net?.role==='guest'&&round?.online&&screen==='game'){net.lobby.close();net=null;announce(message,'You can finish the round on this device.','bad');return;}
  netUi={...netUi,mode:netUi.mode==='busy'?'choose':netUi.mode,error:message};if(screen!=='game'||overlay==='online'){overlay='online';render();}else announce(message,'','bad');
 }
+function leaveLobby(error){
+ const joinCode=net?.lobby.code;net?.lobby.close();net=null;netUi={mode:'choose',joinCode,error};
+ if(screen==='game')announce(error,'You can finish the round on this device.','bad');else{overlay='online';render();}
+}
 function onHostMessage(m,seat){
  if(m.t!=='swing'||!round?.online||round.activePlayer!==seat||screen!=='game'||overlay||busy||round.phase!=='playing')return;
  if(Number.isInteger(m.club)&&CLUBS[m.club])clubIndex=m.club;
@@ -319,8 +323,8 @@ function onHostMessage(m,seat){
  power=clampPower(Number(m.power)||0);aim=Math.atan2(Math.sin(a),Math.cos(a));scene.setAim(aim);shoot(true);
 }
 function onGuestMessage(m){
- if(m.t==='full')return netError('That lobby is full or already playing.');
- if(m.t==='kicked'){const joinCode=net?.lobby.code;net?.lobby.close();net=null;netUi={mode:'choose',joinCode,error:'The host removed you from the lobby.'};if(screen==='game')announce(netUi.error,'You can finish the round on this device.','bad');else{overlay='online';render();}return;}
+ if(m.t==='full')return leaveLobby('That lobby is full or already playing.');
+ if(m.t==='kicked')return leaveLobby('The host removed you from the lobby.');
  if(m.t==='lobby'){netUi={...netUi,mode:'joined',players:m.players};if(overlay==='online')render();return;}
  if(m.t==='start'){net.seat=m.seat;camera.stop();shotGeneration++;busy=false;round=m.round;save();enterGame();return;}
  if(m.t==='shot'&&round?.online&&screen==='game'&&!busy){overlay=null;playResult(m.result);return;}
