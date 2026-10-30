@@ -4,10 +4,10 @@ import {createRound} from '../../src/game/round.js';
 import {PRESETS} from '../../src/game/profiles.js';
 import {DEFAULT_SETTINGS} from '../../src/game/storage.js';
 test('a golfer can customize, save, start a round, swing and resume',async({page})=>{
- await page.goto('/');await expect(page.getByRole('button',{name:'Play a round',exact:true})).toBeVisible();
+ await page.goto('/');await expect(page.getByRole('button',{name:'Tee off now',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Your golfer',exact:true}).click();
  await page.getByLabel('Golfer name').fill('Ocean Ace');await page.getByRole('button',{name:'Save golfer',exact:true}).click();
- await page.getByRole('button',{name:'Play a round',exact:true}).click();
+ await page.getByRole('button',{name:'Set up a round',exact:true}).click();
  await page.getByRole('button',{name:'Tee off',exact:true}).click();
  await expect(page.locator('.game-hud')).toBeVisible();
  await page.getByRole('button',{name:'Swing',exact:true}).click();
@@ -62,4 +62,17 @@ test('maximum charge stays inside the slim meter and orbit does not change aim',
  await page.getByRole('button',{name:'Reset view',exact:true}).click();await page.getByLabel('Planned power').fill('85');
  await page.waitForTimeout(800);await page.screenshot({path:'docs/verification/renderer-integrated-play.png'});
  await page.setViewportSize({width:1024,height:768});await page.waitForTimeout(500);await page.screenshot({path:'docs/verification/renderer-integrated-laptop.png'});
+});
+test('Tee off now starts the nine in one click and a shot can be skipped to its result',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'Tee off now',exact:true}).click();
+ await expect(page.locator('.game-hud')).toBeVisible();await expect(page.locator('#distance-value')).toContainText('310');
+ await page.getByRole('button',{name:'Swing',exact:true}).click();
+ const skip=page.getByRole('button',{name:'Skip to result',exact:true});await expect(skip).toBeEnabled();
+ const started=Date.now();await skip.click();
+ await expect(page.locator('#stroke-value')).toHaveText('2',{timeout:5000});expect(Date.now()-started).toBeLessThan(5000);
+ await expect(page.locator('#shot-announcement strong')).toContainText('yd');
+ await page.keyboard.press('Space');await page.keyboard.press('Enter');
+ await expect(page.locator('#stroke-value')).toHaveText('3',{timeout:5000});
+ await page.getByRole('button',{name:'Pause',exact:true}).click();await page.getByRole('button',{name:'Save & exit',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Resume round',exact:true})).toBeVisible();await expect(page.locator('.quick-meta')).toContainText('Hole 1 of 9');
 });

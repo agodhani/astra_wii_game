@@ -2,7 +2,7 @@ import './ui/styles.css';
 import {GolfScene} from './render/scene.js';
 import {HOLES,distance,surfaceAt} from './game/courses.js';
 import {CLUBS,simulateShot,recommendedClub,clampPower} from './game/physics.js';
-import {createRound,applyShot,nextHole,totalScore} from './game/round.js';
+import {createRound,applyShot,nextHole,totalScore,scoreLabel} from './game/round.js';
 import {PRESETS,validProfile} from './game/profiles.js';
 import {readSave,writeSave} from './game/storage.js';
 import {CameraController} from './input/camera.js';
@@ -25,7 +25,7 @@ const currentPlayer=()=>round?.players[round.activePlayer];
 const isCamera=()=>currentPlayer()?.profile.input==='camera';
 const save=()=>{data.round=round;if(!writeSave(data))toast('Browser storage is full or unavailable. This round will stay open, but may not survive a reload.');};
 function toast(message){const el=document.querySelector('#toast');el.textContent=message;el.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),4500);}
-function announce(message){const el=document.querySelector('#shot-announcement');if(!el)return;el.textContent=message;clearTimeout(announcementTimer);announcementTimer=setTimeout(()=>{if(el.isConnected)el.textContent='';},4200);}
+function announce(message,detail='',tone=''){const el=document.querySelector('#shot-announcement');if(!el)return;el.innerHTML=message?`<strong>${escapeHtml(message)}</strong>${detail?`<span>${escapeHtml(detail)}</span>`:''}`:'';el.dataset.tone=tone;clearTimeout(announcementTimer);announcementTimer=setTimeout(()=>{if(el.isConnected)el.textContent='';},4200);}
 function setSceneHole(hole){if(activeSceneHole!==hole.id){scene.setHole(hole);activeSceneHole=hole.id;}}
 
 const camera=new CameraController({
@@ -37,7 +37,7 @@ const camera=new CameraController({
 function render(){
  if(camera.video?.isConnected)dock.append(camera.video);
  let html='';
- if(screen==='menu')html=screens.menuScreen(data);
+ if(screen==='menu')html=screens.menuScreen(data,data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0]);
  if(screen==='setup')html=screens.setupScreen(data,setup);
  if(screen==='custom')html=screens.customScreen(edited,data);
  if(screen==='game')html=screens.gameScreen(round,currentHole(),currentPlayer());
@@ -96,7 +96,7 @@ function updateHud(){
  document.querySelector('#risk-label').textContent=result.penalty?'Projected hazard · Try another line':power>1?'Overhit · Wider landing area':'';
  document.querySelector('#power-caption').textContent=isCamera()?'TARGET / PRACTICE POWER':'SHOT POWER';
  document.querySelector('#power-instruction').textContent=isCamera()?'Swing to play · Actual power is measured from your gesture':'Hold & release to swing · Click for planned power';
- const swing=document.querySelector('#swing');swing.disabled=busy||isCamera();swing.querySelector('span').textContent=busy?'In flight…':isCamera()?'Swing on camera':'Swing';
+ const swing=document.querySelector('#swing');swing.disabled=!busy&&isCamera();swing.classList.toggle('skipping',busy);swing.querySelector('span').textContent=busy?'Skip to result':isCamera()?'Swing on camera':'Swing';
  document.querySelector('#input-toggle').innerHTML=`${icon(isCamera()?'camera':'keyboard',15)} ${isCamera()?'Camera swing':'Keyboard & mouse'} ▾`;
  document.querySelector('#camera-badge').hidden=!isCamera();
  for(const e of app.querySelectorAll('.club-control button,.aim-controls button,#power-slider'))e.disabled=busy;
@@ -137,7 +137,7 @@ function shoot(){
  scene.animateShot(result,()=>{
    if(generation!==shotGeneration)return;
    round=applyShot(round,result);busy=false;save();audio.play(result.holed?'win':'ball');
-   const message=result.holed?'In the cup!':result.penalty?'Hazard · +1 penalty. Back to your previous lie.':`${Math.round(result.total)} yards · ${round.practice?'Nice swing. Try another.':result.lie}`;
+   const [message,detail,tone]=shotSummary(result,previousPlayer);
    const changedPlayer=previousPlayer!==round.activePlayer;
    if(changedPlayer)camera.stop();
    scene.setPlayer(currentPlayer().profile);scene.setBall(currentPlayer().ball);
@@ -146,11 +146,24 @@ function shoot(){
    clubIndex=round.practice?clubIndex:recommendedClub(currentHole(),currentPlayer().ball);scene.setAim(aim);scene.resetView();
    if(round.phase==='hole-complete')overlay='hole';
    else if(isCamera()&&!cameraStatus.calibrated)overlay='camera';
-   render();announce(message);
+   render();announce(message,detail,tone);
  });
 }
-function beginCharge(){if(screen!=='game'||overlay||busy||isCamera())return;charging={time:performance.now(),initial:power};}
-function releaseCharge(){if(!charging)return;const c=charging;charging=null;power=performance.now()-c.time<180?c.initial:clampPower((performance.now()-c.time)/1800);shoot();}
+function shotSummary(result,playerIndex){
+ const player=round.players[playerIndex],hole=currentHole(),lie=result.lie.replace(/^\w/,c=>c.toUpperCase());
+ if(result.holed&&!round.practice)return [player.strokes===1?'Hole in one!':`${scoreLabel(player.strokes,hole.par)}!`,`In the cup in ${player.strokes}`,'great'];
+ if(result.holed)return ['In the cup!','Nice swing. Try another.','great'];
+ if(result.penalty)return [result.hazard?.lie==='water'?'Splash!':'Out of bounds','+1 penalty · Back to your previous lie','bad'];
+ if(round.practice)return [`${Math.round(result.total)} yd`,`${lie} · Nice swing. Try another.`,''];
+ const left=distance(player.ball,hole.pin);
+ return [`${Math.round(result.total)} yd`,`${lie} · ${result.lie==='green'?`${Math.round(left*3)} ft`:`${Math.round(left)} yd`} to the pin`,result.lie==='green'||result.lie==='fairway'?'good':''];
+}
+function skipShot(){if(screen==='game'&&!overlay&&busy)scene.skipShot();}
+// Input timestamps keep a slow frame from stretching a short press into a charged swing.
+function beginCharge(time=performance.now()){if(screen!=='game'||overlay||busy||isCamera())return;charging={time,initial:power};}
+// A tap or ordinary press always uses planned power; charging only begins after a deliberate hold.
+const HOLD_DELAY=400,chargePower=elapsed=>clampPower((elapsed-HOLD_DELAY)/1800);
+function releaseCharge(time=performance.now()){if(!charging)return;const c=charging;charging=null;const held=time-c.time;power=held<HOLD_DELAY?c.initial:chargePower(held);shoot();}
 function alterAim(delta){if(screen!=='game'||busy||overlay)return;aim+=delta;scene.setAim(aim);updateHud();}
 function changeClub(delta){if(screen!=='game'||busy)return;clubIndex=(clubIndex+delta+CLUBS.length)%CLUBS.length;updateHud();}
 function saveProfile(asNew=false){
@@ -173,7 +186,8 @@ const actions={
  scorecard(){returnOverlay=overlay;overlay='scorecard';camera.setArmed(false);render();},'close-scorecard'(){overlay=returnOverlay;returnOverlay=null;render();},
  'next-hole'(){round=nextHole(round);camera.stop();save();if(round.phase==='results'){if(round.holeIds.length===9&&!round.practice){const best=Math.min(...round.players.map(totalScore));data.best=data.best?Math.min(data.best,best):best;save();}overlay='results';audio.play('win');render();}else enterGame();},
  'prev-club':()=>changeClub(-1),'next-club':()=>changeClub(1),'aim-left':()=>alterAim(-.025),'aim-right':()=>alterAim(.025),'reset-view':()=>scene.resetView(),
- swing(){if(skipClick){skipClick=false;return;}shoot();},
+ swing(){if(skipClick){skipClick=false;return;}if(busy){skipShot();return;}shoot();},
+ quick(){setup.courseMode='nine';setup.players=[{id:setup.players[0]?.id||data.profiles[0].id,input:'keyboard'}];startRound();},
  'toggle-input'(){if(busy)return;if(isCamera()){currentPlayer().profile.input='keyboard';camera.stop();save();render();}else{currentPlayer().profile.input='camera';overlay='camera';save();render();}},
  'camera-setup'(){camera.setArmed(false);overlay='camera';render();},'enable-camera':enableCamera,
  calibrate:()=>camera.calibrate(),
@@ -204,11 +218,11 @@ app.addEventListener('change',event=>{
  if(e.id==='camera-reduced'){data.settings.gestureReduced=e.checked;camera.setOptions({reducedMotion:e.checked});save();}
  if(e.id==='camera-device'&&cameraStatus.state!=='idle')enableCamera();
 });
-app.addEventListener('pointerdown',event=>{if(event.target.closest('#swing')&&!isCamera()){event.preventDefault();audio.unlock();event.target.closest('#swing').setPointerCapture(event.pointerId);beginCharge();}});
-app.addEventListener('pointerup',event=>{if(charging){skipClick=true;releaseCharge();}});
+app.addEventListener('pointerdown',event=>{if(event.target.closest('#swing')&&!isCamera()){event.preventDefault();audio.unlock();event.target.closest('#swing').setPointerCapture(event.pointerId);beginCharge(event.timeStamp);}});
+app.addEventListener('pointerup',event=>{if(charging){skipClick=true;releaseCharge(event.timeStamp);}});
 app.addEventListener('pointercancel',()=>{charging=null;updateHud();});
 let orbit=null;
-canvas.addEventListener('pointerdown',e=>{if((screen==='game'&&!overlay&&!busy)||screen==='custom'){orbit={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);}});
+canvas.addEventListener('pointerdown',e=>{if(screen==='game'&&!overlay&&busy){skipShot();return;}if((screen==='game'&&!overlay&&!busy)||screen==='custom'){orbit={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);}});
 canvas.addEventListener('pointermove',e=>{if(orbit){scene.orbit(e.clientX-orbit.x,e.clientY-orbit.y);orbit={x:e.clientX,y:e.clientY};}});
 canvas.addEventListener('pointerup',()=>orbit=null);canvas.addEventListener('pointercancel',()=>orbit=null);
 window.addEventListener('keydown',event=>{
@@ -218,15 +232,16 @@ window.addEventListener('keydown',event=>{
  // shortcut must never turn Pause, a club arrow, or a menu action into a shot.
  if(event.key===' '&&event.target.closest('button,a,[role="button"]')&&event.target.closest('button')?.id!=='swing')return;
  if((screen==='custom'||(screen==='game'&&!overlay&&!busy))&&['j','l','i','k'].includes(event.key.toLowerCase())){const key=event.key.toLowerCase();scene.orbit(key==='j'?-24:key==='l'?24:0,key==='i'?-12:key==='k'?12:0);return;}
+ if(screen==='game'&&!overlay&&busy&&(event.key===' '||event.key==='Enter')&&!event.repeat){event.preventDefault();skipShot();return;}
  if(screen!=='game'||overlay||busy)return;
  if([' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))event.preventDefault();
- if(event.key===' '&&!event.repeat){audio.unlock();beginCharge();}
+ if(event.key===' '&&!event.repeat){audio.unlock();beginCharge(event.timeStamp);}
  if(event.key.toLowerCase()==='a'||event.key==='ArrowLeft')alterAim(-.025);
  if(event.key.toLowerCase()==='d'||event.key==='ArrowRight')alterAim(.025);
  if(event.key.toLowerCase()==='q')changeClub(-1);if(event.key.toLowerCase()==='e')changeClub(1);
  if(event.key==='ArrowUp'||event.key==='ArrowDown'){power=clampPower(power+(event.key==='ArrowUp'?.025:-.025));updateHud();}
 });
-window.addEventListener('keyup',event=>{if(event.key===' '&&charging){event.preventDefault();releaseCharge();}});
+window.addEventListener('keyup',event=>{if(event.key===' '&&charging){event.preventDefault();releaseCharge(event.timeStamp);}});
 window.addEventListener('blur',()=>{charging=null;if(screen==='game'&&!overlay)actions.pause();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){camera.setArmed(false);audio.suspend();if(screen==='game'&&!overlay)actions.pause();}});
 window.addEventListener('beforeunload',()=>{camera.stop();save();});
@@ -241,7 +256,7 @@ try{
  render();document.querySelector('#loading').remove();
  let last=performance.now(),lastPreview=0;
  function frame(now){const dt=(now-last)/1000;last=now;
-  if(charging&&now-lastPreview>65){power=clampPower((now-charging.time)/1800);updateHud();lastPreview=now;}
+  if(charging&&now-charging.time>=HOLD_DELAY&&now-lastPreview>65){power=chargePower(now-charging.time);updateHud();lastPreview=now;}
   if(!(screen==='game'&&overlay&&busy))scene.update(dt);
   requestAnimationFrame(frame);
  }requestAnimationFrame(frame);
