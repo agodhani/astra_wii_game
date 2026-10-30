@@ -118,7 +118,7 @@ export class GolfScene {
   const g=this.gov;g.t+=dt;g.n++;
   if(g.t<1)return;
   const fps=g.n/g.t,max=Math.min(window.devicePixelRatio||1,1.5),min=.5;g.t=0;g.n=0;
-  let scale=this.renderScale??max;
+  let scale=Math.min(max,this.renderScale??max);
   if(fps<45){g.good=0;scale=Math.max(min,scale*clamp(fps/55,.6,.9));}
   else if(fps>57){if(++g.good>=3){g.good=0;scale=Math.min(max,scale*1.15);}}
   else g.good=0;
