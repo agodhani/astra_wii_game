@@ -95,7 +95,8 @@ test('near the pin the map switches to a green read with downhill arrows and fee
 test('a challenge link lands on a one-click challenge and the results card shares a new one',async({page,context})=>{
  await page.goto('/?beat=34&by=Maya&card=443433544');
  await expect(page.locator('.challenge-banner')).toContainText('Maya shot 34');
- await expect(page.locator('.challenge-card')).toHaveText(/🐦/u);
+ await expect(page.locator('.challenge-card .mark')).toHaveCount(9);
+ await expect(page.locator('.challenge-card .mark[data-d="-1"]')).toHaveCount(4);
  await page.getByRole('button',{name:'Take the challenge',exact:true}).click();
  await expect(page.locator('.game-hud')).toBeVisible();
 
