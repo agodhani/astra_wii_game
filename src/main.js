@@ -10,9 +10,11 @@ import {drawMinimap,minimapView} from './ui/minimap.js';
 import {GolfAudio} from './audio.js';
 import {icon,escapeHtml} from './ui/icons.js';
 import * as screens from './ui/screens.js';
+import {Lobby,normalizeCode,joinUrl} from './net/lobby.js';
 import {parseChallenge,challengeFromRound,challengeUrl,challengeText} from './game/challenge.js';
 
 const challenge=parseChallenge(location.search);
+let net=null,netUi={mode:'choose'};
 
 const app=document.querySelector('#app'),canvas=document.querySelector('#world');
 const dock=document.createElement('div');dock.id='camera-dock';document.body.append(dock);
@@ -51,6 +53,7 @@ function render(){
  if(overlay==='scorecard')html+=screens.scorecardScreen(round);
  if(overlay==='hole')html+=screens.holeCompleteScreen(round);
  if(overlay==='results')html+=screens.scorecardScreen(round,true,challenge);
+ if(overlay==='online')html+=screens.onlineScreen(netUi);
  app.innerHTML=html;
  document.body.classList.toggle('reduced-motion',data.settings.reducedMotion);
  if(screen==='game'){updateHud();if(overlay!=='camera')camera.setArmed(!overlay&&!busy&&isCamera()&&cameraStatus.calibrated);}
@@ -104,7 +107,7 @@ function updateHud(){
  document.querySelector('#risk-label').textContent=result.penalty?'Projected hazard · Try another line':power>1?'Overhit · Wider landing area':'';
  document.querySelector('#power-caption').textContent=isCamera()?'TARGET / PRACTICE POWER':'SHOT POWER';
  document.querySelector('#power-instruction').textContent=isCamera()?'Swing to play · Actual power is measured from your gesture':'Hold & release to swing · Click for planned power';
- const swing=document.querySelector('#swing');swing.disabled=!busy&&isCamera();swing.classList.toggle('skipping',busy);swing.querySelector('span').textContent=busy?'Skip to result':isCamera()?'Swing on camera':'Swing';
+ const swing=document.querySelector('#swing');swing.disabled=!busy&&(isCamera()||!myTurn());swing.classList.toggle('skipping',busy);swing.querySelector('span').textContent=busy?'Skip to result':!myTurn()?`${currentPlayer().profile.name}’s turn`:isCamera()?'Swing on camera':'Swing';
  document.querySelector('#input-toggle').innerHTML=`${icon(isCamera()?'camera':'keyboard',15)} ${isCamera()?'Camera swing':'Keyboard & mouse'} ▾`;
  document.querySelector('#camera-badge').hidden=!isCamera();
  for(const e of app.querySelectorAll('.club-control button,.aim-controls button,#power-slider'))e.disabled=busy;
@@ -137,10 +140,21 @@ async function enableCamera(){
  const deviceId=document.querySelector('#camera-device').value;
  try{await camera.start(video,{deviceId,handedness:data.settings.handedness,sensitivity:data.settings.sensitivity,reducedMotion:data.settings.gestureReduced});await refreshDevices();}catch(error){if(error.name!=='AbortError')toast(error.message);}
 }
-function shoot(){
+function myTurn(){
+ if(!net||!round?.online)return true;
+ const seat=round.activePlayer;
+ return net.role==='guest'?seat===net.seat:!net.lobby.isPresent(seat)||seat===0;
+}
+function shoot(remote=false){
  if(screen!=='game'||overlay||busy||round.phase!=='playing')return;
- busy=true;camera.setArmed(false);audio.play('shot');updateHud();
+ if(net?.role==='guest'&&round.online){if(myTurn())net.lobby.send({t:'swing',club:clubIndex,power,aim});return;}
+ if(!remote&&!myTurn())return;
  const result=simulateShot({hole:currentHole(),start:currentPlayer().ball,club:CLUBS[clubIndex],power,aim,accuracy:(Math.random()*2-1)});
+ if(net?.role==='host'&&round.online)net.lobby.broadcast({t:'shot',result});
+ playResult(result);
+}
+function playResult(result){
+ busy=true;camera.setArmed(false);audio.play('shot');updateHud();
  const generation=shotGeneration,previousPlayer=round.activePlayer;
  scene.animateShot(result,()=>{
    if(generation!==shotGeneration)return;
@@ -196,6 +210,30 @@ const actions={
      else{await navigator.clipboard.writeText(`${text}\n${url}`);if(btn)btn.textContent='Link copied ✓';}
    }catch(error){if(error?.name!=='AbortError')window.prompt('Copy your challenge link',url);}
  },
+ online(){net?.lobby.close();net=null;netUi={mode:'choose'};overlay='online';render();},
+ async 'host-lobby'(){
+   net?.lobby.close();netUi={mode:'busy',status:'Opening a lobby…'};render();
+   const lobby=new Lobby({onMessage:onHostMessage,onError:netError,onPeers:()=>{if(net?.lobby!==lobby)return;netUi.players=lobbyNames();lobby.broadcast({t:'lobby',players:netUi.players});if(overlay==='online')render();}});
+   net={role:'host',lobby,seat:0};
+   const code=await lobby.host();if(!code||net?.lobby!==lobby)return;
+   const QRCode=(await import('qrcode')).default,qr=await QRCode.toString(joinUrl(code,location.href),{type:'svg',margin:1,color:{dark:'#183c37',light:'#fffaf0'}});
+   if(net?.lobby!==lobby)return;netUi={mode:'hosting',code,qr,players:lobbyNames()};render();
+ },
+ async 'join-lobby'(){
+   const code=normalizeCode(document.querySelector('#join-code')?.value);
+   if(!code){netUi={...netUi,error:'Enter the 4-letter lobby code.'};render();return;}
+   net?.lobby.close();netUi={mode:'busy',status:`Joining ${code}…`};render();
+   const lobby=new Lobby({onMessage:onGuestMessage,onError:netError});net={role:'guest',lobby,seat:null};
+   if(await lobby.join(code)&&net?.lobby===lobby){netUi={mode:'joined',code,players:[]};lobby.send({t:'hello',profile:myProfile()});render();}
+ },
+ 'start-online'(){
+   if(net?.role!=='host')return;const guests=net.lobby.guests.filter(g=>!g.gone);if(!guests.length)return;
+   net.lobby.locked=true;net.lobby.guests=guests;
+   const players=[myProfile(),...guests.map(g=>validProfile(g.profile)?g.profile:{...PRESETS[1],name:String(g.profile?.name||'Guest').slice(0,24)||'Guest'})].map(p=>({...structuredClone(p),input:'keyboard'}));
+   camera.stop();shotGeneration++;busy=false;round=createRound(players,HOLES.map(h=>h.id));round.online=true;save();
+   guests.forEach((g,i)=>net.lobby.sendTo(i+1,{t:'start',round,seat:i+1}));enterGame();
+ },
+ 'leave-lobby'(){net?.lobby.close();net=null;netUi={mode:'choose'};overlay=null;render();},
  replay(){round=createRound(round.players.map(p=>p.profile),round.holeIds,round.practice);camera.stop();shotGeneration++;busy=false;save();enterGame();},
  settings(){returnOverlay=overlay;overlay='settings';render();},'close-settings'(){overlay=returnOverlay;returnOverlay=null;save();render();},
  tutorial(){tutorialStep=0;overlay='tutorial';render();},'tutorial-next'(){tutorialStep++;render();},'tutorial-prev'(){tutorialStep--;render();},
@@ -241,6 +279,31 @@ let orbit=null;
 canvas.addEventListener('pointerdown',e=>{if(screen==='game'&&!overlay&&busy){skipShot();return;}if((screen==='game'&&!overlay&&!busy)||screen==='custom'){orbit={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);}});
 canvas.addEventListener('pointermove',e=>{if(orbit){scene.orbit(e.clientX-orbit.x,e.clientY-orbit.y);orbit={x:e.clientX,y:e.clientY};}});
 canvas.addEventListener('pointerup',()=>orbit=null);canvas.addEventListener('pointercancel',()=>orbit=null);
+for(const name of ['next-hole','replay']){
+ const local=actions[name];
+ actions[name]=()=>{
+   if(net?.role==='guest'&&round?.online){toast('Waiting for the host to continue');return;}
+   local();if(net?.role==='host'&&round?.online)net.lobby.broadcast({t:'sync',round});
+ };
+}
+function myProfile(){return data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0];}
+function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>String(g.profile?.name||'Guest').slice(0,24))];}
+function netError(message){
+ if(net?.role==='guest'&&round?.online&&screen==='game'){net.lobby.close();net=null;announce(message,'You can finish the round on this device.','bad');return;}
+ netUi={...netUi,mode:netUi.mode==='busy'?'choose':netUi.mode,error:message};if(screen!=='game'||overlay==='online'){overlay='online';render();}else announce(message,'','bad');
+}
+function onHostMessage(m,seat){
+ if(m.t!=='swing'||!round?.online||round.activePlayer!==seat||screen!=='game'||overlay||busy||round.phase!=='playing')return;
+ if(Number.isInteger(m.club)&&CLUBS[m.club])clubIndex=m.club;
+ power=clampPower(Number(m.power)||0);aim=Math.max(-1.5,Math.min(1.5,Number(m.aim)||0));scene.setAim(aim);shoot(true);
+}
+function onGuestMessage(m){
+ if(m.t==='full')return netError('That lobby is full or already playing.');
+ if(m.t==='lobby'){netUi={...netUi,mode:'joined',players:m.players};if(overlay==='online')render();return;}
+ if(m.t==='start'){net.seat=m.seat;camera.stop();shotGeneration++;busy=false;round=m.round;save();enterGame();return;}
+ if(m.t==='shot'&&round?.online&&screen==='game'&&!busy){overlay=null;playResult(m.result);return;}
+ if(m.t==='sync'&&round?.online){shotGeneration++;busy=false;round=m.round;save();enterGame();}
+}
 window.addEventListener('keydown',event=>{
  if(['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
  if(event.key==='Escape'){event.preventDefault();if(screen==='game'){if(overlay==='pause')actions.continue();else if(!overlay)actions.pause();}return;}
@@ -269,6 +332,7 @@ document.addEventListener('keydown',event=>{
 
 try{
  scene=new GolfScene(canvas,{onError:toast});scene.setHole(HOLES[0]);activeSceneHole=0;scene.setPlayer(data.profiles[0]);scene.setMode('menu');scene.setQuality(data.settings.quality);scene.setReducedMotion(data.settings.reducedMotion);window.__golfPerf=scene.perf;
+ const inviteCode=normalizeCode(new URLSearchParams(location.search).get('join'));if(inviteCode){netUi={mode:'choose',joinCode:inviteCode};overlay='online';}
  render();document.querySelector('#loading').remove();
  let last=performance.now(),lastPreview=0;
  function frame(now){const dt=(now-last)/1000;last=now;
