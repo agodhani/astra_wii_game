@@ -91,3 +91,27 @@ test('near the pin the map switches to a green read with downhill arrows and fee
  }
  await page.locator('.minimap-panel').screenshot({path:'test-results/green-read.png'});
 });
+
+test('a challenge link lands on a one-click challenge and the results card shares a new one',async({page,context})=>{
+ await page.goto('/?beat=34&by=Maya&card=443433544');
+ await expect(page.locator('.challenge-banner')).toContainText('Maya shot 34');
+ await expect(page.locator('.challenge-card')).toHaveText(/🐦/u);
+ await page.getByRole('button',{name:'Take the challenge',exact:true}).click();
+ await expect(page.locator('.game-hud')).toBeVisible();
+
+ await context.grantPermissions(['clipboard-read','clipboard-write']);
+ const round=createRound(PRESETS.slice(0,1),HOLES.map(h=>h.id));round.holeIndex=8;
+ Object.assign(round.players[0],{ball:{x:HOLES[8].pin.x,z:HOLES[8].pin.z-5},strokes:1,scores:HOLES.slice(0,8).map(h=>h.par)});
+ const fixture={version:1,profiles:PRESETS,settings:{...DEFAULT_SETTINGS,reducedMotion:true,quality:'low'},round,best:null};
+ await page.addInitScript(value=>{localStorage.setItem('blue-bay-golf-v1',JSON.stringify(value));Object.defineProperty(navigator,'share',{value:undefined});},fixture);
+ await page.goto('/?beat=34&by=Maya');
+ await page.getByRole('button',{name:'Resume round',exact:true}).click();
+ await page.getByLabel('Planned power').fill('43');await page.getByRole('button',{name:'Swing',exact:true}).click();
+ await page.getByRole('button',{name:'See your results',exact:true}).click();
+ await expect(page.locator('.challenge-verdict')).toHaveText('You beat Maya by 2!');
+ await page.getByRole('button',{name:'Challenge a friend',exact:true}).click();
+ await expect(page.locator('[data-action="share"]')).toHaveText('Link copied ✓');
+ const shared=await page.evaluate(()=>navigator.clipboard.readText());
+ expect(shared).toContain(`shot 32`);expect(shared).toContain('?beat=32&by=');
+ await page.locator('.scorecard-card').screenshot({path:'test-results/challenge-results.png'});
+});
