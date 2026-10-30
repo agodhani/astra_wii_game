@@ -70,3 +70,17 @@ test('full-shot geometry preserves sampled flight and curved rollout', () => {
   assert.equal(geometry.hazardPoint, null);
   assert.equal(geometry.resetPoint, null);
 });
+
+test('map zooms to a green read near the pin or with the putter and keeps the whole-hole overview otherwise', async () => {
+ const {minimapView,GREEN_VIEW_RANGE}=await import('../src/ui/minimap.js');
+ const {HOLES}=await import('../src/game/courses.js');
+ const hole=HOLES[0],driver={id:'driver'},putter={id:'putter'};
+ const tee=minimapView(hole,hole.tee,driver);
+ assert.equal(tee.green,false);
+ assert.ok(Math.abs(220/2+(0-tee.cx)*tee.scale-110)<1e-9);
+ assert.ok(Math.abs(330/2-(0-tee.cz)*tee.scale-(330-20))<1e-9);
+ const near={x:hole.pin.x,z:hole.pin.z-6},close=minimapView(hole,near,driver);
+ assert.equal(close.green,true);
+ assert.ok(close.scale>tee.scale*4);
+ assert.equal(minimapView(hole,{x:hole.pin.x,z:hole.pin.z-GREEN_VIEW_RANGE-5},putter).green,true);
+});
