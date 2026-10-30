@@ -213,7 +213,7 @@ const actions={
  online(){net?.lobby.close();net=null;netUi={mode:'choose'};overlay='online';render();},
  async 'host-lobby'(){
    net?.lobby.close();netUi={mode:'busy',status:'Opening a lobby…'};render();
-   const lobby=new Lobby({onMessage:onHostMessage,onError:netError,onPeers:()=>{if(net?.lobby!==lobby)return;netUi.players=lobbyNames();lobby.broadcast({t:'lobby',players:netUi.players});if(overlay==='online')render();}});
+   const lobby=new Lobby({onMessage:onHostMessage,onError:netError,onPeers:()=>{if(net?.lobby!==lobby)return;netUi.players=lobbyNames();lobby.broadcast({t:'lobby',players:netUi.players});if(overlay==='online')render();else if(screen==='game')updateHud();}});
    net={role:'host',lobby,seat:0};
    const code=await lobby.host();if(!code||net?.lobby!==lobby)return;
    const QRCode=(await import('qrcode')).default,qr=await QRCode.toString(joinUrl(code,location.href),{type:'svg',margin:1,color:{dark:'#183c37',light:'#fffaf0'}});
