@@ -23,6 +23,10 @@ export class GolfScene {
   this.ball=new THREE.Mesh(ballGeo,new THREE.MeshStandardMaterial({color:'#fffef2',roughness:.36}));this.ball.castShadow=true;this.scene.add(this.ball);
   // The glow is attached to the actual moving ball, never a predicted position.
   this.ballHalo=new THREE.Mesh(new THREE.SphereGeometry(.28,14,10),new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.15,depthWrite:false}));this.ball.add(this.ballHalo);
+  // Shot tracer: one tube along the airborne path, revealed with the real ball.
+  this.tracerMaterial=new THREE.MeshBasicMaterial({color:'#fff3c4',transparent:true,opacity:.9,depthWrite:false});this.tracer=null;
+  this.landingRing=new THREE.Mesh(new THREE.RingGeometry(.7,1,40),new THREE.MeshBasicMaterial({color:'#fff6d6',transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
+  this.landingRing.rotation.x=-Math.PI/2;this.landingRing.visible=false;this.ringAge=0;this.scene.add(this.landingRing);
   this.lookAt=new THREE.Vector3();this.desiredPosition=new THREE.Vector3();this.desiredLookAt=new THREE.Vector3();this.initialCamera=true;
   this.contextLost=event=>{event.preventDefault();onError?.('The 3D view was interrupted. Reload the page to restore it; your round is saved.');};canvas.addEventListener('webglcontextlost',this.contextLost);
   this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>this.resize()):null;this.resizeObserver?.observe(canvas);this.resize();
@@ -30,7 +34,7 @@ export class GolfScene {
  setHole(hole){
   if(!hole)return;
   if(this.environment)disposeObject(this.environment);
-  this.hole=hole;this.environment=createEnvironment(hole);this.scene.add(this.environment);this.shot=null;this.setBall(hole.tee);this.resetView();
+  this.hole=hole;this.environment=createEnvironment(hole);this.scene.add(this.environment);this.shot=null;this.clearTracer();this.setBall(hole.tee);this.resetView();
  }
  setPlayer(profile){
   if(this.avatar)disposeObject(this.avatar);
@@ -59,7 +63,7 @@ export class GolfScene {
  resetView(){this.orbitYaw=0;this.orbitPitch=0;this.initialCamera=true;}
  setMode(mode){
   if(!['menu','play','avatar'].includes(mode))return;
-  this.mode=mode;this.shot=null;this.initialCamera=true;this.ball.visible=mode==='play';this.avatarYaw=0;this.placeAvatar();
+  this.mode=mode;this.shot=null;this.clearTracer();this.initialCamera=true;this.ball.visible=mode==='play';this.avatarYaw=0;this.placeAvatar();
   if(this.avatar)this.avatar.visible=mode!=='menu';this.resize();
  }
  setQuality(quality){
@@ -72,7 +76,30 @@ export class GolfScene {
  setReducedMotion(value){this.reducedMotion=!!value;}
  animateShot(result,onComplete){
   if(!result?.path?.length){this.setBall(result?.end||this.ballPoint);onComplete?.();return;}
-  this.shot={result,onComplete,elapsed:0,index:0,duration:Math.max(.01,result.path.at(-1).t||3),followStarted:false};this.celebration=0;
+  const landingT=result.path[result.landingPathIndex]?.t||0;
+  this.shot={result,onComplete,elapsed:0,sim:0,tail:0,index:0,landingT,landed:false,duration:Math.max(.01,result.path.at(-1).t||3),followStarted:false};this.celebration=0;
+  this.buildTracer(result);
+ }
+ // Jump straight to the resolved result. The outcome is already simulated, so skipping only saves waiting.
+ skipShot(){if(this.shot)this.shot.skip=true;}
+ get shotInFlight(){return !!this.shot;}
+ buildTracer(result){
+  this.clearTracer();
+  const air=result.path.slice(0,(result.landingPathIndex||0)+1);
+  if(air.length<3)return;
+  const curve=new THREE.CatmullRomCurve3(air.map(p=>new THREE.Vector3(p.x,p.y,p.z)));
+  const segments=Math.min(160,air.length*2),radial=6;
+  const geometry=new THREE.TubeGeometry(curve,segments,.13,radial,false);geometry.setDrawRange(0,0);
+  this.tracerMaterial.opacity=.9;
+  this.tracer=new THREE.Mesh(geometry,this.tracerMaterial);this.tracer.userData={segments,radial,count:air.length-1};this.tracer.renderOrder=2;this.scene.add(this.tracer);
+ }
+ revealTracer(fraction){
+  if(!this.tracer)return;const {segments,radial}=this.tracer.userData;
+  this.tracer.geometry.setDrawRange(0,Math.ceil(clamp(fraction,0,1)*segments)*radial*6);
+ }
+ clearTracer(){
+  if(this.tracer){this.scene.remove(this.tracer);this.tracer.geometry.dispose();this.tracer=null;}
+  if(this.landingRing){this.landingRing.visible=false;this.ringAge=0;}
  }
  celebrate(){this.celebration=2.6;}
  resize(){
@@ -88,30 +115,48 @@ export class GolfScene {
  }
  update(dt){
   if(this.disposed||!this.hole)return;
-  dt=clamp(Number(dt)||0,0,.08);this.time+=dt;
+  // Shots run on wall-clock time so a slow frame rate never stretches a shot; scenery keeps a small step.
+  const realDt=clamp(Number(dt)||0,0,.5);
+  dt=Math.min(realDt,.08);this.time+=dt;
   this.environment?.userData.animate?.(this.time,this.reducedMotion);
   this.celebration=Math.max(0,this.celebration-dt);
   let kind=this.mode==='play'?'address':'idle',animationTime=this.time;
   if(this.shot){
-   const shot=this.shot;shot.elapsed+=dt;
+   const shot=this.shot;shot.elapsed+=realDt;
    const swingDuration=this.reducedMotion ? .45 : .92;
    kind='swing';animationTime=Math.min(1,shot.elapsed/swingDuration);
+   if(shot.skip){shot.elapsed=Math.max(shot.elapsed,swingDuration*.52);shot.sim=shot.duration;shot.tail=1;}
    if(shot.elapsed>=swingDuration*.52){
     const path=shot.result.path;
-    const flightTime=(shot.elapsed-swingDuration*.52)*(this.reducedMotion?2.2:1.6);
+    // Air time plays at a readable pace; rollout fast-forwards.
+    if(shot.sim<shot.duration){const air=shot.sim<shot.landingT;shot.sim=Math.min(shot.duration,shot.sim+realDt*(this.reducedMotion?2.4:air?1.7:4));}
+    else shot.tail+=realDt;
+    const flightTime=shot.sim;
     while(shot.index<path.length-2&&path[shot.index+1].t<=flightTime)shot.index++;
     const a=path[shot.index],b=path[Math.min(path.length-1,shot.index+1)];
     const f=clamp((flightTime-a.t)/Math.max(.00001,b.t-a.t),0,1);
     this.ball.position.set(THREE.MathUtils.lerp(a.x,b.x,f),THREE.MathUtils.lerp(a.y,b.y,f),THREE.MathUtils.lerp(a.z,b.z,f));
     const distance=this.camera.position.distanceTo(this.ball.position);this.ball.scale.setScalar(clamp(distance/70,1,2.2));
     shot.followStarted=true;
-    if(flightTime>shot.duration+.8){
+    const landingIndex=shot.result.landingPathIndex||0;
+    if(this.tracer)this.revealTracer(landingIndex?Math.min(1,(shot.index+f)/landingIndex):1);
+    if(!shot.landed&&shot.landingT>0&&flightTime>=shot.landingT){
+     shot.landed=true;const l=path[landingIndex]||a;
+     this.landingRing.position.set(l.x,this.ground(l.x,l.z)+.08,l.z);this.landingRing.visible=true;this.ringAge=0;
+    }
+    if(shot.tail>=.35){
      this.shot=null;this.ball.scale.setScalar(1);this.setBall(shot.result.end);this.initialCamera=false;
      if(shot.result.holed)this.celebrate();
      shot.onComplete?.();
     }
    }
   }
+  if(this.landingRing.visible){
+   this.ringAge+=realDt;const k=this.ringAge/.9;
+   this.landingRing.scale.setScalar(1+k*3.2);this.landingRing.material.opacity=Math.max(0,.85*(1-k));
+   if(k>=1)this.landingRing.visible=false;
+  }
+  if(this.tracer&&!this.shot)this.tracerMaterial.opacity=Math.max(.35,this.tracerMaterial.opacity-realDt*.6);
   if(this.celebration>0){kind='celebration';animationTime=2.6-this.celebration;}
   if(this.avatar){this.avatar.visible=this.mode!=='menu';this.avatar.userData.animate(this.reducedMotion&&kind==='idle'?0:animationTime,kind);}
   this.updateCamera(dt);

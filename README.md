@@ -30,7 +30,8 @@ Open the localhost URL shown in the terminal. The contents of `dist/` can be hos
 
 ## Play
 
-- **Play a round:** choose all nine holes, the opening three, or an individual hole. Add one to four players and choose each player's controls.
+- **Tee off now:** one click starts the full nine as your last-selected golfer with keyboard and mouse. An unfinished round turns this into **Resume round**.
+- **Set up a round:** choose all nine holes, the opening three, or an individual hole. Add one to four players and choose each player's controls.
 - **Your golfer:** start from Maya, Kai, Amir, Zoe, Leo or Val. Edit name, relaxed/sharp face, build, hair, skin, outfit, colors, hat and accessories. Save over the selected profile or create a new local golfer.
 - **Practice range:** take repeat shots from the tee. Use the input selector to try camera swings when ready.
 - **How to play:** five short lessons explain clubs, the minimap, power, webcam setup and scoring.
@@ -40,14 +41,17 @@ Open the localhost URL shown in the terminal. The contents of `dist/` can be hos
 | A / D or left / right arrows | Rotate shot aim |
 | Q / E or club selector arrows | Previous / next club |
 | Power meter / up / down arrows | Adjust planned power |
-| Click Swing | Shoot with planned power |
-| Hold Swing, then release | Charge and shoot |
+| Click Swing or tap Space | Shoot with planned power |
+| Hold Swing or Space past 0.4 s, then release | Charge and shoot |
+| Skip to result, Space, Enter or click the course while the ball is moving | Jump to where the ball stops |
 | Space, when the course has keyboard focus | Charge and shoot |
 | Drag the course or J / L / I / K | Orbit the view without changing aim |
 | Reset-view button | Return to the shot camera |
 | Escape / Pause | Pause the round |
 
 White minimap dots represent 25%, 50%, 75% and 100% club power. The gold diamond is estimated carry; the dashed path and stopping marker show rollout. Wind, slope and lie affect the prediction. At **100–120%**, overhit gives modest extra range with a wider accuracy spread. The meter never overflows. Driver, wood, two irons, pitching wedge, sand wedge and putter behave differently.
+
+A glowing tracer follows the ball in the air, a ring marks where it lands, and rollout plays fast-forward. Shots use real elapsed time, so a low frame rate does not stretch them. A result card shows the distance, lie and distance left (feet on the green), or the score name when you hole out.
 
 Water and out-of-bounds add one penalty stroke and return the ball to its previous lie. Local golfers play from the farthest unfinished ball. A hole ends at the cup or the forgiving 12-stroke cap. Characters, settings, best nine-hole score and round progress save in this browser; they do not sync between computers.
 
