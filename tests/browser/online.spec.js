@@ -14,7 +14,7 @@ test('a host opens a lobby, a friend joins by code link and turns pass between d
  await host.goto('/');
  await host.getByRole('button',{name:'Play online',exact:true}).click();
  await host.getByRole('button',{name:'Host a lobby',exact:true}).click();
- await expect(host.locator('#lobby-code')).toHaveText(/^[A-Z2-9]{4}$/,{timeout:30000});
+ await expect(host.locator('#lobby-code')).toHaveText(/^[A-Z2-9]{6}$/,{timeout:30000});
  await expect(host.locator('.lobby-qr svg')).toBeVisible();
  const code=await host.locator('#lobby-code').textContent();
 
@@ -24,7 +24,16 @@ test('a host opens a lobby, a friend joins by code link and turns pass between d
  await expect(guest.locator('.lobby-players li')).toHaveCount(2,{timeout:30000});
  await expect(host.locator('.lobby-players li')).toHaveCount(2,{timeout:30000});
  await expect(host.locator('.lobby-players')).toContainText(PRESETS[1].name);
+ const intruder=await (await browser.newContext()).newPage();await seed(intruder,[PRESETS[2],...PRESETS.filter((_,i)=>i!==2)]);
+ await intruder.goto(`/?join=${code}`);await intruder.getByRole('button',{name:'Join lobby',exact:true}).click();
+ await expect(host.locator('.lobby-players li')).toHaveCount(3,{timeout:30000});
  await host.locator('.lobby-card').screenshot({path:'test-results/lobby-host.png'});
+ await host.getByRole('button',{name:`Remove ${PRESETS[2].name}`}).click();
+ await expect(host.locator('.lobby-players li')).toHaveCount(2);
+ await expect(intruder.locator('.lobby-error')).toHaveText('The host removed you from the lobby.',{timeout:30000});
+ await intruder.getByRole('button',{name:'Join lobby',exact:true}).click();
+ await expect(intruder.locator('.lobby-error')).toHaveText('The host removed you from the lobby.',{timeout:30000});
+ await expect(host.locator('.lobby-players li')).toHaveCount(2);
 
  await host.getByRole('button',{name:'Tee off with 2 golfers',exact:true}).click();
  await expect(host.locator('.game-hud')).toBeVisible();

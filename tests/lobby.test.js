@@ -10,7 +10,7 @@ function fakeNetwork(){
  class Peer{
   constructor(id){Object.assign(this,emitter());this.id=id??`anon-${anon++}`;
    queueMicrotask(()=>{if(peers.has(this.id))return this.emit('error',{type:'unavailable-id'});peers.set(this.id,this);this.emit('open');});}
-  connect(id){const a=new Conn(),b=new Conn();a.other=b;b.other=a;const host=peers.get(id);
+  connect(id){const a=new Conn(),b=new Conn();a.other=b;b.other=a;a.peer=id;b.peer=this.id;const host=peers.get(id);
    queueMicrotask(()=>{if(!host)return this.emit('error',{type:'peer-unavailable'});a.open=b.open=true;host.emit('connection',b);a.emit('open');});return a;}
   destroy(){peers.delete(this.id);}
  }
@@ -18,9 +18,9 @@ function fakeNetwork(){
 }
 
 test('codes avoid ambiguous characters and normalise user input', () => {
- for(let i=0;i<200;i++)assert.match(lobbyCode(),/^[A-HJKMNP-Z2-9]{4}$/);
- assert.equal(normalizeCode(' ab-c d '),'ABCD');assert.equal(normalizeCode('AB0D'),null);assert.equal(normalizeCode('ABC'),null);
- assert.equal(joinUrl('ABCD','https://x.test/golf/?beat=3#h'),'https://x.test/golf/?join=ABCD');
+ for(let i=0;i<200;i++)assert.match(lobbyCode(),/^[A-HJKMNP-Z2-9]{6}$/);
+ assert.equal(normalizeCode(' ab-c d e9 '),'ABCDE9');assert.equal(normalizeCode('AB0DEF'),null);assert.equal(normalizeCode('ABCD'),null);
+ assert.equal(joinUrl('ABCDEF','https://x.test/golf/?beat=3#h'),'https://x.test/golf/?join=ABCDEF');
 });
 
 test('guests join a hosted lobby, get seats and route swings to the host', async () => {
@@ -42,6 +42,17 @@ test('a full or started lobby turns new guests away and unknown codes report an 
  const {Peer}=fakeNetwork(),host=new Lobby({PeerImpl:Peer});const code=await host.host();
  host.locked=true;const late=[],g=new Lobby({PeerImpl:Peer,onMessage:m=>late.push(m)});await g.join(code);g.send({t:'hello',profile:{name:'Late'}});
  assert.deepEqual(late,[{t:'full'}]);assert.equal(host.guests.length,0);
- const errors=[],lost=new Lobby({PeerImpl:Peer,onError:e=>errors.push(e)});lost.join('ZZZZ');
- await new Promise(r=>setTimeout(r,5));assert.deepEqual(errors,['No lobby found for ZZZZ.']);
+ const errors=[],lost=new Lobby({PeerImpl:Peer,onError:e=>errors.push(e)});lost.join('ZZZZZZ');
+ await new Promise(r=>setTimeout(r,5));assert.deepEqual(errors,['No lobby found for ZZZZZZ.']);
+});
+
+test('the host can remove a golfer, who is told and cannot rejoin from the same device', async () => {
+ const {Peer}=fakeNetwork(),peers=[];const host=new Lobby({PeerImpl:Peer,onPeers:()=>peers.push(host.guests.length)});const code=await host.host();
+ const got=[],g=new Lobby({PeerImpl:Peer,onMessage:m=>got.push(m)});await g.join(code);g.send({t:'hello',profile:{name:'Rando'}});
+ assert.equal(host.guests.length,1);
+ host.kick(1);
+ assert.equal(host.guests.length,0);assert.deepEqual(got,[{t:'kicked'}]);assert.deepEqual(peers,[1,0]);
+ g.send({t:'hello',profile:{name:'Rando'}});
+ assert.equal(host.guests.length,0);assert.deepEqual(got,[{t:'kicked'},{t:'kicked'}]);
+ await new Promise(r=>setTimeout(r,450));
 });

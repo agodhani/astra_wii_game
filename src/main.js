@@ -14,7 +14,7 @@ import {Lobby,normalizeCode,joinUrl} from './net/lobby.js';
 import {parseChallenge,challengeFromRound,challengeUrl,challengeText} from './game/challenge.js';
 
 const challenge=parseChallenge(location.search);
-let net=null,netUi={mode:'choose'};
+let net=null,netUi={mode:'choose'},actionTarget=null;
 
 const app=document.querySelector('#app'),canvas=document.querySelector('#world');
 const dock=document.createElement('div');dock.id='camera-dock';document.body.append(dock);
@@ -221,10 +221,10 @@ const actions={
  },
  async 'join-lobby'(){
    const code=normalizeCode(document.querySelector('#join-code')?.value);
-   if(!code){netUi={...netUi,error:'Enter the 4-letter lobby code.'};render();return;}
+   if(!code){netUi={...netUi,error:'Enter the 6-character lobby code.'};render();return;}
    net?.lobby.close();netUi={mode:'busy',status:`Joining ${code}…`};render();
    const lobby=new Lobby({onMessage:onGuestMessage,onError:netError});net={role:'guest',lobby,seat:null};
-   if(await lobby.join(code)&&net?.lobby===lobby){netUi={mode:'joined',code,players:[]};lobby.send({t:'hello',profile:myProfile()});render();}
+   if(await lobby.join(code)&&net?.lobby===lobby){netUi={mode:'joined',code,players:[]};lobby.send({t:'hello',profile:myProfile(),device:deviceId()});render();}
  },
  'start-online'(){
    if(net?.role!=='host')return;const guests=net.lobby.guests.filter(g=>!g.gone);if(!guests.length)return;
@@ -233,6 +233,7 @@ const actions={
    camera.stop();shotGeneration++;busy=false;round=createRound(players,HOLES.map(h=>h.id));round.online=true;save();
    guests.forEach((g,i)=>net.lobby.sendTo(i+1,{t:'start',round,seat:i+1}));enterGame();
  },
+ kick(){if(net?.role==='host')net.lobby.kick(Number(actionTarget?.dataset.seat));},
  'leave-lobby'(){net?.lobby.close();net=null;netUi={mode:'choose'};overlay=null;render();},
  replay(){round=createRound(round.players.map(p=>p.profile),round.holeIds,round.practice);camera.stop();shotGeneration++;busy=false;save();enterGame();},
  settings(){returnOverlay=overlay;overlay='settings';render();},'close-settings'(){overlay=returnOverlay;returnOverlay=null;save();render();},
@@ -250,7 +251,7 @@ const actions={
 };
 
 app.addEventListener('click',event=>{
- const action=event.target.closest('[data-action]');if(action&&!action.disabled){audio.unlock();actions[action.dataset.action]?.();return;}
+ const action=event.target.closest('[data-action]');if(action&&!action.disabled){audio.unlock();actionTarget=action;actions[action.dataset.action]?.();return;}
  const preset=event.target.closest('[data-preset]');if(preset){edited=structuredClone(PRESETS.find(p=>p.id===preset.dataset.preset));scene.setPlayer(edited);render();return;}
  const field=event.target.closest('[data-field]');if(field){edited.name=document.querySelector('#golfer-name').value.trim()||edited.name;edited[field.dataset.field]=field.dataset.value;scene.setPlayer(edited);render();return;}
  const mode=event.target.closest('[data-course-mode]');if(mode){setup.courseMode=mode.dataset.courseMode;render();return;}
@@ -299,6 +300,11 @@ function guestProfile(raw,seat){
  picked.id=`guest-${seat}`;picked.name=guestName(raw);
  return validProfile(picked)?picked:{...base,id:`guest-${seat}`,name:guestName(raw)};
 }
+function deviceId(){
+ let id=localStorage.getItem('blue-bay-golf-device');
+ if(!id){id=crypto.randomUUID?.()||Math.random().toString(36).slice(2);localStorage.setItem('blue-bay-golf-device',id);}
+ return id;
+}
 function myProfile(){return data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0];}
 function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>guestName(g.profile))];}
 function netError(message){
@@ -313,6 +319,7 @@ function onHostMessage(m,seat){
 }
 function onGuestMessage(m){
  if(m.t==='full')return netError('That lobby is full or already playing.');
+ if(m.t==='kicked'){const joinCode=net?.lobby.code;net?.lobby.close();net=null;netUi={mode:'choose',joinCode,error:'The host removed you from the lobby.'};if(screen==='game')announce(netUi.error,'You can finish the round on this device.','bad');else{overlay='online';render();}return;}
  if(m.t==='lobby'){netUi={...netUi,mode:'joined',players:m.players};if(overlay==='online')render();return;}
  if(m.t==='start'){net.seat=m.seat;camera.stop();shotGeneration++;busy=false;round=m.round;save();enterGame();return;}
  if(m.t==='shot'&&round?.online&&screen==='game'&&!busy){overlay=null;playResult(m.result);return;}

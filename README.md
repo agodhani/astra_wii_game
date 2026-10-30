@@ -31,7 +31,7 @@ Open the localhost URL shown in the terminal. The contents of `dist/` can be hos
 ## Play
 
 - **Tee off now:** one click starts the full nine as your last-selected golfer with keyboard and mouse. An unfinished round turns this into **Resume round**.
-- **Play online:** Play online → Host a lobby gives a 4-letter code and a QR join link. Up to 3 friends join on their own devices, and turns pass automatically. The host's game runs every shot and sends the result to the other players over PeerJS's free public broker (`src/net/lobby.js`), so no server is needed. `tests/browser/online.spec.js` needs internet access.
+- **Play online:** Play online → Host a lobby gives a 6-character code and a QR join link. Up to 3 friends join on their own devices (the host can remove anyone), and turns pass automatically. The host's game runs every shot and sends the result to the other players over PeerJS's free public broker (`src/net/lobby.js`), so no server is needed. `tests/browser/online.spec.js` needs internet access.
 - **Challenge a friend:** after a scored nine, the results card shares a link with your score and an emoji scorecard. Anyone who opens it lands on a menu with a "Take the challenge" one-click start, and their results card shows who won.
 - **Read the green:** within 40 yd of the pin, or with the putter, the map zooms to the ball and the cup. It shows downhill slope arrows and 10/20 ft rings, and putts show the estimated roll and the distance left, in feet.
 - **Set up a round:** choose all nine holes, the opening three, or an individual hole. Add one to four players and choose each player's controls.
