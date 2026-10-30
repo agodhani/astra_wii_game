@@ -10,6 +10,9 @@ import {drawMinimap,minimapView} from './ui/minimap.js';
 import {GolfAudio} from './audio.js';
 import {icon,escapeHtml} from './ui/icons.js';
 import * as screens from './ui/screens.js';
+import {parseChallenge,challengeFromRound,challengeUrl,challengeText} from './game/challenge.js';
+
+const challenge=parseChallenge(location.search);
 
 const app=document.querySelector('#app'),canvas=document.querySelector('#world');
 const dock=document.createElement('div');dock.id='camera-dock';document.body.append(dock);
@@ -37,7 +40,7 @@ const camera=new CameraController({
 function render(){
  if(camera.video?.isConnected)dock.append(camera.video);
  let html='';
- if(screen==='menu')html=screens.menuScreen(data,data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0]);
+ if(screen==='menu')html=screens.menuScreen(data,data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0],challenge);
  if(screen==='setup')html=screens.setupScreen(data,setup);
  if(screen==='custom')html=screens.customScreen(edited,data);
  if(screen==='game')html=screens.gameScreen(round,currentHole(),currentPlayer());
@@ -47,7 +50,7 @@ function render(){
  if(overlay==='camera')html+=screens.cameraScreen(data.settings);
  if(overlay==='scorecard')html+=screens.scorecardScreen(round);
  if(overlay==='hole')html+=screens.holeCompleteScreen(round);
- if(overlay==='results')html+=screens.scorecardScreen(round,true);
+ if(overlay==='results')html+=screens.scorecardScreen(round,true,challenge);
  app.innerHTML=html;
  document.body.classList.toggle('reduced-motion',data.settings.reducedMotion);
  if(screen==='game'){updateHud();if(overlay!=='camera')camera.setArmed(!overlay&&!busy&&isCamera()&&cameraStatus.calibrated);}
@@ -185,6 +188,14 @@ const actions={
  pause(){if(screen!=='game')return;charging=null;camera.setArmed(false);overlay='pause';render();},
  continue(){overlay=null;render();},exit:goMenu,
  restart(){if(!confirm('Restart this round? Your current round progress will be replaced.'))return;round=createRound(round.players.map(p=>p.profile),round.holeIds,round.practice);camera.stop();shotGeneration++;busy=false;save();enterGame();},
+ async share(){
+   const c=challengeFromRound(round);if(!c)return;
+   const url=challengeUrl(c,location.href),text=challengeText(c),btn=document.querySelector('[data-action="share"]');
+   try{
+     if(navigator.share)await navigator.share({title:'Blue Bay Golf',text,url});
+     else{await navigator.clipboard.writeText(`${text}\n${url}`);if(btn)btn.textContent='Link copied ✓';}
+   }catch(error){if(error?.name!=='AbortError')window.prompt('Copy your challenge link',url);}
+ },
  replay(){round=createRound(round.players.map(p=>p.profile),round.holeIds,round.practice);camera.stop();shotGeneration++;busy=false;save();enterGame();},
  settings(){returnOverlay=overlay;overlay='settings';render();},'close-settings'(){overlay=returnOverlay;returnOverlay=null;save();render();},
  tutorial(){tutorialStep=0;overlay='tutorial';render();},'tutorial-next'(){tutorialStep++;render();},'tutorial-prev'(){tutorialStep--;render();},

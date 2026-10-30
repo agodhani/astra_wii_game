@@ -17,3 +17,8 @@
 .swing-btn.skipping{background:#fff4d6!important;box-shadow:0 0 0 2px #e8b45a inset}
 .reduced-motion .shot-announcement:not(:empty){animation:none}
 @media(max-width:760px){.shot-announcement strong{font-size:26px}.shot-announcement span{font-size:11px}.quick-meta{font-size:11px}}
+.challenge-banner{display:inline-flex;flex-direction:column;gap:5px;padding:12px 18px;margin-bottom:16px;border-radius:18px;background:#fff8e6ee;border:1px solid #f1d99a;box-shadow:0 12px 30px #183c3726;color:#183c37}
+.challenge-banner .eyebrow{margin:0}
+.challenge-banner strong{font-family:'Manrope',sans-serif;font-size:24px;letter-spacing:-.02em}
+.challenge-card{display:flex;gap:5px;margin-top:2px}.challenge-card .mark{width:15px;height:15px;border-radius:4px;background:#8fc27a}.challenge-card .mark[data-d="-2"]{background:#e2a93b}.challenge-card .mark[data-d="-1"]{background:#2cafe7}.challenge-card .mark[data-d="1"]{background:#f1d06b}.challenge-card .mark[data-d="2"]{background:#ef725d}
+.challenge-verdict{font-family:'Manrope',sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;color:#9a6a1c;text-align:center;margin:8px 0 0}
