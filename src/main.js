@@ -229,7 +229,7 @@ const actions={
  'start-online'(){
    if(net?.role!=='host')return;const guests=net.lobby.guests.filter(g=>!g.gone);if(!guests.length)return;
    net.lobby.locked=true;net.lobby.guests=guests;
-   const players=[myProfile(),...guests.map(g=>validProfile(g.profile)?g.profile:{...PRESETS[1],name:String(g.profile?.name||'Guest').slice(0,24)||'Guest'})].map(p=>({...structuredClone(p),input:'keyboard'}));
+   const players=[myProfile(),...guests.map((g,i)=>guestProfile(g.profile,i+1))].map(p=>({...structuredClone(p),input:'keyboard'}));
    camera.stop();shotGeneration++;busy=false;round=createRound(players,HOLES.map(h=>h.id));round.online=true;save();
    guests.forEach((g,i)=>net.lobby.sendTo(i+1,{t:'start',round,seat:i+1}));enterGame();
  },
@@ -279,12 +279,24 @@ let orbit=null;
 canvas.addEventListener('pointerdown',e=>{if(screen==='game'&&!overlay&&busy){skipShot();return;}if((screen==='game'&&!overlay&&!busy)||screen==='custom'){orbit={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);}});
 canvas.addEventListener('pointermove',e=>{if(orbit){scene.orbit(e.clientX-orbit.x,e.clientY-orbit.y);orbit={x:e.clientX,y:e.clientY};}});
 canvas.addEventListener('pointerup',()=>orbit=null);canvas.addEventListener('pointercancel',()=>orbit=null);
-for(const name of ['next-hole','replay']){
+for(const name of ['next-hole','replay','restart']){
  const local=actions[name];
  actions[name]=()=>{
-   if(net?.role==='guest'&&round?.online){toast('Waiting for the host to continue');return;}
-   local();if(net?.role==='host'&&round?.online)net.lobby.broadcast({t:'sync',round});
+   const online=round?.online;
+   if(net?.role==='guest'&&online){toast('Waiting for the host to continue');return;}
+   local();
+   if(net?.role==='host'&&online){round.online=true;save();net.lobby.broadcast({t:'sync',round});}
  };
+}
+for(const name of ['exit','menu']){
+ const local=actions[name];
+ actions[name]=()=>{if(net&&round?.online){net.lobby.close();net=null;}local();};
+}
+// Copy only known profile fields from a peer, with a local id, so nothing unvalidated reaches rendering.
+function guestProfile(raw,seat){
+ const base=PRESETS[seat%PRESETS.length],picked=Object.fromEntries(Object.keys(base).map(k=>[k,raw?.[k]]));
+ picked.id=`guest-${seat}`;
+ return validProfile(picked)?picked:{...base,id:`guest-${seat}`,name:String(raw?.name||'Guest').slice(0,24)||'Guest'};
 }
 function myProfile(){return data.profiles.find(p=>p.id===setup.players[0]?.id)||data.profiles[0];}
 function lobbyNames(){return [myProfile().name,...net.lobby.guests.filter(g=>!g.gone).map(g=>String(g.profile?.name||'Guest').slice(0,24))];}
@@ -295,7 +307,8 @@ function netError(message){
 function onHostMessage(m,seat){
  if(m.t!=='swing'||!round?.online||round.activePlayer!==seat||screen!=='game'||overlay||busy||round.phase!=='playing')return;
  if(Number.isInteger(m.club)&&CLUBS[m.club])clubIndex=m.club;
- power=clampPower(Number(m.power)||0);aim=Math.max(-1.5,Math.min(1.5,Number(m.aim)||0));scene.setAim(aim);shoot(true);
+ const a=Number(m.aim);if(!Number.isFinite(a))return;
+ power=clampPower(Number(m.power)||0);aim=Math.atan2(Math.sin(a),Math.cos(a));scene.setAim(aim);shoot(true);
 }
 function onGuestMessage(m){
  if(m.t==='full')return netError('That lobby is full or already playing.');
