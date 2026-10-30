@@ -31,6 +31,7 @@ Open the localhost URL shown in the terminal. The contents of `dist/` can be hos
 ## Play
 
 - **Tee off now:** one click starts the full nine as your last-selected golfer with keyboard and mouse. An unfinished round turns this into **Resume round**.
+- **Read the green:** within 40 yd of the pin, or with the putter, the map zooms to the ball and the cup. It shows downhill slope arrows and 10/20 ft rings, and putts show the estimated roll and the distance left, in feet.
 - **Set up a round:** choose all nine holes, the opening three, or an individual hole. Add one to four players and choose each player's controls.
 - **Your golfer:** start from Maya, Kai, Amir, Zoe, Leo or Val. Edit name, relaxed/sharp face, build, hair, skin, outfit, colors, hat and accessories. Save over the selected profile or create a new local golfer.
 - **Practice range:** take repeat shots from the tee. Use the input selector to try camera swings when ready.

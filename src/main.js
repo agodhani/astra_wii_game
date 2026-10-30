@@ -6,7 +6,7 @@ import {createRound,applyShot,nextHole,totalScore,scoreLabel} from './game/round
 import {PRESETS,validProfile} from './game/profiles.js';
 import {readSave,writeSave} from './game/storage.js';
 import {CameraController} from './input/camera.js';
-import {drawMinimap} from './ui/minimap.js';
+import {drawMinimap,minimapView} from './ui/minimap.js';
 import {GolfAudio} from './audio.js';
 import {icon,escapeHtml} from './ui/icons.js';
 import * as screens from './ui/screens.js';
@@ -90,8 +90,13 @@ function updateHud(){
  document.querySelector('#power-slider').value=Math.round(power*100);
  document.querySelector('#power-fill').style.width=`${power/1.2*100}%`;
  document.querySelector('#power-needle').style.left=`${Math.max(.8,power/1.2*100)}%`;
- document.querySelector('#carry-value').innerHTML=`${Math.round(result.carry)} <small>yd</small>`;
- document.querySelector('#total-value').innerHTML=`${Math.round(result.total)} <small>yd</small>`;
+ const green=minimapView(h,p.ball,club).green,putt=green&&club.id==='putter',left=distance(result.stop||result.end,h.pin);
+ document.querySelector('#map-title').textContent=green?'READ THE GREEN':'THE LAY OF THE LAND';
+ document.querySelector('#map-help').textContent=green?'Arrows run downhill · Rings: 10 / 20 ft':'Dots: 25 · 50 · 75 · 100% power';
+ document.querySelector('#carry-label').textContent=putt?'Est. roll':'Est. carry';
+ document.querySelector('#total-label').textContent=putt?'Leaves':'Est. total';
+ document.querySelector('#carry-value').innerHTML=putt?`${Math.round(result.total*3)} <small>ft</small>`:`${Math.round(result.carry)} <small>yd</small>`;
+ document.querySelector('#total-value').innerHTML=putt?(result.holed?'In <small>the cup</small>':`${Math.round(left*3)} <small>ft</small>`):`${Math.round(result.total)} <small>yd</small>`;
  document.querySelector('#aim-value').textContent=`${Math.round(aim*180/Math.PI)}°`;
  document.querySelector('#risk-label').textContent=result.penalty?'Projected hazard · Try another line':power>1?'Overhit · Wider landing area':'';
  document.querySelector('#power-caption').textContent=isCamera()?'TARGET / PRACTICE POWER':'SHOT POWER';

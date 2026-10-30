@@ -76,3 +76,18 @@ test('Tee off now starts the nine in one click and a shot can be skipped to its 
  await page.getByRole('button',{name:'Pause',exact:true}).click();await page.getByRole('button',{name:'Save & exit',exact:true}).click();
  await expect(page.getByRole('button',{name:'Resume round',exact:true})).toBeVisible();await expect(page.locator('.quick-meta')).toContainText('Hole 1 of 9');
 });
+
+test('near the pin the map switches to a green read with downhill arrows and feet',async({page})=>{
+ const round=createRound(PRESETS.slice(0,1),[HOLES[8].id]);
+ round.players[0].ball={x:HOLES[8].pin.x,z:HOLES[8].pin.z-6};round.players[0].strokes=2;
+ const fixture={version:1,profiles:PRESETS,settings:{...DEFAULT_SETTINGS,reducedMotion:true,quality:'low'},round,best:null};
+ await page.addInitScript(value=>localStorage.setItem('blue-bay-golf-v1',JSON.stringify(value)),fixture);await page.goto('/');
+ await page.getByRole('button',{name:'Resume round',exact:true}).click();
+ await expect(page.locator('#map-title')).toHaveText('READ THE GREEN');
+ await expect(page.locator('#map-help')).toContainText('10 / 20 ft');
+ if(await page.locator('#club-code').textContent()==='PT'){
+  await expect(page.locator('#carry-label')).toHaveText('Est. roll');
+  await expect(page.locator('#total-value')).toContainText(/ft|cup/);
+ }
+ await page.locator('.minimap-panel').screenshot({path:'test-results/green-read.png'});
+});
