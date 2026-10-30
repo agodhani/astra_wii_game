@@ -123,13 +123,13 @@ export class GolfScene {
   else if(fps>57){if(++g.good>=3){g.good=0;scale=Math.min(max,scale*1.15);}}
   else g.good=0;
   this.perf.fps=Math.round(fps);
-  if(scale!==this.renderScale){this.renderScale=scale;this.perf.scale=+scale.toFixed(2);this.resize();}
+  if(scale!==this.renderScale){this.renderScale=scale;this.resize();}
  }
  resize(){
   if(this.disposed)return;
   const rect=this.canvas.getBoundingClientRect();const width=Math.max(1,rect.width||this.canvas.clientWidth||window.innerWidth),height=Math.max(1,rect.height||this.canvas.clientHeight||window.innerHeight);
   this.width=width;this.height=height;
-  this.renderer.setPixelRatio(this.pixelRatio());this.renderer.setSize(width,height,false);
+  this.renderer.setPixelRatio(this.pixelRatio());this.perf.scale=+this.renderer.getPixelRatio().toFixed(2);this.renderer.setSize(width,height,false);
   this.camera.aspect=width/height;this.camera.clearViewOffset();
   // Full-screen canvas is shared by the cream editor; keep the model in its left preview pane.
   if(this.mode==='avatar'&&width>760)this.camera.setViewOffset(width,height,width*.27,0,width,height);
