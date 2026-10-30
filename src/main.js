@@ -206,7 +206,7 @@ app.addEventListener('click',event=>{
 app.addEventListener('input',event=>{
  const e=event.target;
  if(e.id==='power-slider'){power=clampPower(Number(e.value)/100);updateHud();}
- if(e.dataset.setting){const k=e.dataset.setting;data.settings[k]=e.type==='checkbox'?e.checked:e.tagName==='SELECT'?e.value:Number(e.value);audio.setSettings(data.settings);scene.setQuality(data.settings.quality);scene.setReducedMotion(data.settings.reducedMotion);document.body.classList.toggle('reduced-motion',data.settings.reducedMotion);save();}
+ if(e.dataset.setting){const k=e.dataset.setting;data.settings[k]=e.type==='checkbox'?e.checked:e.tagName==='SELECT'?e.value:Number(e.value);audio.setSettings(data.settings);if(k==='quality')scene.setQuality(data.settings.quality);scene.setReducedMotion(data.settings.reducedMotion);document.body.classList.toggle('reduced-motion',data.settings.reducedMotion);save();}
  if(e.id==='camera-sensitivity'){data.settings.sensitivity=Number(e.value);camera.setOptions({sensitivity:data.settings.sensitivity});save();}
 });
 app.addEventListener('change',event=>{
