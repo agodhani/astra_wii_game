@@ -83,6 +83,26 @@ Browser tests build and serve production assets on port 4173. They use Chromium'
 
 The renderer uses original procedural 3D geometry rather than the detailed raster concept art. It provides graphics quality and reduced-motion settings. The default **Auto** quality measures the frame rate every second: below 45 FPS it lowers render resolution (down to 0.5×); after three seconds above 57 FPS it raises it again, up to 1.5× on high-DPI screens. `window.__golfPerf` reports the current FPS and render scale. Software SwiftShader measured about 8.6 FPS at 1440×1000 in an earlier renderer-only sample; this is not a hardware GPU performance measurement. Smooth performance on the target laptop remains to be measured.
 
+## Security and review pipeline
+
+Every change goes through two gates: [no-mistakes](https://github.com/kunchenguid/no-mistakes) on your machine before push, and GitHub Actions (`.github/workflows/ci.yml`, `.github/workflows/security.yml`) on the PR.
+
+```sh
+no-mistakes init                # once per clone; adds the `no-mistakes` git remote
+git push no-mistakes <branch>   # review -> test -> security gates -> push -> PR -> CI
+npm run security                # run the security scanners directly
+```
+
+`.no-mistakes.yaml` adds three security gates to the AI review and test steps. Each runs `scripts/security/gate.mjs`, which CI runs too:
+
+| Gate | Scanner | Blocks on | Fix policy |
+|---|---|---|---|
+| `secrets` | gitleaks (all commits plus working tree) | any leaked credential | always waits for you (rotate the credential) |
+| `sast` | semgrep `p/javascript` + `p/security-audit` | `ERROR` rules | one automatic repair round |
+| `deps` | osv-scanner on `package-lock.json` | CVSS 7.0 or higher, or HIGH/CRITICAL or unscored advisories (4.0 to 6.9 warns) | one automatic upgrade round when a fixed version exists |
+
+Install the scanners locally: [gitleaks](https://github.com/gitleaks/gitleaks#installing), [semgrep](https://semgrep.dev/docs/getting-started/cli), [osv-scanner](https://google.github.io/osv-scanner/installation/). A missing scanner fails the gate; it never silently passes. Automatic fixes cannot edit `.no-mistakes.yaml`, `.github/**`, or `scripts/security/**`. no-mistakes only reads its config from `main`.
+
 ## Project structure
 
 - `src/game/`: course geometry, simulation, scoring, profiles and persistence.

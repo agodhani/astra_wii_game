@@ -1,0 +1,42 @@
+# no-mistakes gate config: https://kunchenguid.github.io/no-mistakes/reference/repo-config/
+# no-mistakes reads commands, gates, auto_fix.gates and protected_paths only from
+# the copy on the default branch (main), so edits here take effect after merge.
+#
+# Core pipeline (fixed order): intent -> rebase -> review -> test -> document -> lint -> push -> pr -> ci
+# The security gates below add checks to it; they can never skip or weaken a core step.
+# Scanner logic lives in scripts/security/gate.mjs and is shared with .github/workflows/security.yml.
+
+commands:
+  prepare: "npm ci --prefer-offline --no-audit --no-fund"
+  test: "npm test"
+
+gates:
+  # Secrets run first, before the review agent reads the diff.
+  - name: secrets
+    after: rebase
+    command: "node scripts/security/gate.mjs secrets"
+  - name: sast
+    after: review
+    command: "node scripts/security/gate.mjs sast"
+  - name: deps
+    after: test
+    command: "node scripts/security/gate.mjs deps"
+
+auto_fix:
+  # Review findings wait for your decision (product default).
+  review: 0
+  # One bounded repair round for gate findings marked auto-fix (semgrep hits,
+  # dependency upgrades that have a published fix). Leaked secrets are always
+  # ask-user, because the fix is rotating the credential.
+  gates:
+    sast: 1
+    deps: 1
+
+# Automatic fixes may not edit the pipeline itself; touching these parks for you.
+protected_paths:
+  - ".no-mistakes.yaml"
+  - ".github/**"
+  - "scripts/security/**"
+
+ignore_patterns:
+  - "docs/verification/**"

@@ -9,7 +9,11 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test --test-isolation=none tests/*.test.js",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "security": "npm run security:secrets && npm run security:sast && npm run security:deps",
+    "security:secrets": "node scripts/security/gate.mjs secrets",
+    "security:sast": "node scripts/security/gate.mjs sast",
+    "security:deps": "node scripts/security/gate.mjs deps"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.32",
@@ -19,6 +23,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
-    "vite": "7.3.6"
+    "vite": "7.3.7"
   }
 }
