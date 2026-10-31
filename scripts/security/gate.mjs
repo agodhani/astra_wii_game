@@ -2,7 +2,7 @@
 // Runs one security scanner and reports its results in the no-mistakes
 // structured-findings format (when NO_MISTAKES_FINDINGS_FILE is set) and as
 // GitHub annotations (when GITHUB_ACTIONS is set).
-// Usage: node scripts/security/gate.mjs <secrets|sast|deps> [--history]
+// Usage: node scripts/security/gate.mjs <secrets|sast|deps>
 // Exit codes: 0 = no error findings, 1 = error findings, 2 = scanner unavailable or failed.
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -13,22 +13,22 @@ import {join} from 'node:path';
 const SEMGREP_CONFIGS = ['p/javascript', 'p/security-audit'];
 const SEMGREP_EXCLUDES = ['public', 'dist', 'node_modules', 'test-results', 'playwright-report', 'docs'];
 
-const [kind, ...flags] = process.argv.slice(2);
+const [kind] = process.argv.slice(2);
 let tempDir;
 const scanners = {secrets, sast, deps};
-if (!scanners[kind]) fail(`usage: gate.mjs <${Object.keys(scanners).join('|')}> [--history]`);
+if (!scanners[kind]) fail(`usage: gate.mjs <${Object.keys(scanners).join('|')}>`);
 
 const findings = scanners[kind]();
 report(findings);
 process.exit(findings.some(f => f.severity === 'error') ? 1 : 0);
 
 function secrets() {
-  const out = tempFile('gitleaks.json');
-  const mode = flags.includes('--history') ? ['git', '.'] : ['dir', '.'];
-  const res = run('gitleaks', [...mode, '--redact', '--no-banner', '--exit-code', '0',
-    '--report-format', 'json', '--report-path', out], 'https://github.com/gitleaks/gitleaks#installing');
-  if (res.status !== 0) fail(`gitleaks failed (exit ${res.status})`);
-  return readJson(out).map(leak => ({
+  // Scan every commit (a secret committed then deleted still ships in history)
+  // plus the working tree (uncommitted edits when run by hand).
+  const history = gitleaks(['git', '.'], 'history.json');
+  const seen = new Set(history.map(leak => `${leak.RuleID}:${leak.File}:${leak.StartLine}`));
+  const tree = gitleaks(['dir', '.'], 'tree.json').filter(leak => !seen.has(`${leak.RuleID}:${leak.File}:${leak.StartLine}`));
+  return dedupe([...history, ...tree].map(leak => ({
     id: `secret-${hash(leak.Fingerprint || `${leak.RuleID}:${leak.File}:${leak.StartLine}`)}`,
     severity: 'error',
     file: leak.File,
@@ -36,7 +36,15 @@ function secrets() {
     description: `Possible ${leak.RuleID} secret${leak.Commit ? ` in commit ${leak.Commit.slice(0, 7)}` : ''}. ` +
       'Rotate the credential first; deleting it from the file does not remove it from git history.',
     action: 'ask-user',
-  }));
+  })));
+}
+
+function gitleaks(mode, reportName) {
+  const out = tempFile(reportName);
+  const res = run('gitleaks', [...mode, '--redact', '--no-banner', '--exit-code', '0',
+    '--report-format', 'json', '--report-path', out], 'https://github.com/gitleaks/gitleaks#installing');
+  if (res.status !== 0) fail(`gitleaks ${mode[0]} failed (exit ${res.status})`);
+  return readJson(out);
 }
 
 function sast() {

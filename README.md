@@ -97,7 +97,7 @@ npm run security                # run the security scanners directly
 
 | Gate | Scanner | Blocks on | Fix policy |
 |---|---|---|---|
-| `secrets` | gitleaks | any leaked credential | always waits for you (rotate the credential) |
+| `secrets` | gitleaks (all commits plus working tree) | any leaked credential | always waits for you (rotate the credential) |
 | `sast` | semgrep `p/javascript` + `p/security-audit` | `ERROR` rules | one automatic repair round |
 | `deps` | osv-scanner on `package-lock.json` | CVSS 7.0 or higher (4.0 to 6.9 warns) | one automatic upgrade round when a fixed version exists |
 
