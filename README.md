@@ -99,7 +99,7 @@ npm run security                # run the security scanners directly
 |---|---|---|---|
 | `secrets` | gitleaks (all commits plus working tree) | any leaked credential | always waits for you (rotate the credential) |
 | `sast` | semgrep `p/javascript` + `p/security-audit` | `ERROR` rules | one automatic repair round |
-| `deps` | osv-scanner on `package-lock.json` | CVSS 7.0 or higher (4.0 to 6.9 warns) | one automatic upgrade round when a fixed version exists |
+| `deps` | osv-scanner on `package-lock.json` | CVSS 7.0 or higher, or HIGH/CRITICAL or unscored advisories (4.0 to 6.9 warns) | one automatic upgrade round when a fixed version exists |
 
 Install the scanners locally: [gitleaks](https://github.com/gitleaks/gitleaks#installing), [semgrep](https://semgrep.dev/docs/getting-started/cli), [osv-scanner](https://google.github.io/osv-scanner/installation/). A missing scanner fails the gate; it never silently passes. Automatic fixes cannot edit `.no-mistakes.yaml`, `.github/**`, or `scripts/security/**`. no-mistakes only reads its config from `main`.
 

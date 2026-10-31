@@ -81,7 +81,7 @@ function deps() {
         const cve = (group.aliases || []).find(a => a.startsWith('CVE-'));
         findings.push({
           id: `deps-${name.replace(/[^a-z0-9]+/gi, '-')}-${id}`,
-          severity: cvss >= 7 ? 'error' : cvss >= 4 ? 'warning' : 'info',
+          severity: depSeverity(cvss, vulns),
           file: 'package-lock.json',
           description: `${name}@${version}: ${id}${cve ? ` (${cve})` : ''}` +
             `${Number.isFinite(cvss) && cvss > 0 ? ` CVSS ${cvss}` : ''} - ${vulns[0]?.summary || 'known vulnerability'}. ` +
@@ -92,6 +92,17 @@ function deps() {
     }
   }
   return findings;
+}
+
+// CVSS score when osv-scanner has one, else the advisory's severity label;
+// a vulnerability with neither blocks rather than passing silently.
+function depSeverity(cvss, vulns) {
+  if (Number.isFinite(cvss) && cvss > 0) return cvss >= 7 ? 'error' : cvss >= 4 ? 'warning' : 'info';
+  const labels = vulns.map(v => String(v.database_specific?.severity || '').toUpperCase());
+  if (labels.some(l => l === 'CRITICAL' || l === 'HIGH')) return 'error';
+  if (labels.includes('MODERATE') || labels.includes('MEDIUM')) return 'warning';
+  if (labels.includes('LOW')) return 'info';
+  return 'error';
 }
 
 function fixedVersions(vulns, current) {
