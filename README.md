@@ -93,15 +93,16 @@ git push no-mistakes <branch>   # review -> test -> security gates -> push -> PR
 npm run security                # run the security scanners directly
 ```
 
-`.no-mistakes.yaml` adds three security gates to the AI review and test steps. Each runs `scripts/security/gate.mjs`, which CI runs too:
+`.no-mistakes.yaml` adds four security gates to the AI review and test steps. Each runs `scripts/security/gate.mjs`, which CI runs too:
 
 | Gate | Scanner | Blocks on | Fix policy |
 |---|---|---|---|
 | `secrets` | gitleaks (all commits plus working tree) | any leaked credential | always waits for you (rotate the credential) |
-| `sast` | semgrep `p/javascript` + `p/security-audit` | `ERROR` rules | one automatic repair round |
+| `suppressions` | git diff against `main` | new inline scanner-suppression comments, changes to scanner ignore files or the pipeline | always waits for you (advisory annotations in CI) |
+| `sast` | semgrep `p/javascript` + `p/security-audit` | `ERROR` rules and high-confidence `WARNING` rules | one automatic repair round |
 | `deps` | osv-scanner on `package-lock.json` | CVSS 7.0 or higher, or HIGH/CRITICAL or unscored advisories (4.0 to 6.9 warns) | one automatic upgrade round when a fixed version exists |
 
-Install the scanners locally: [gitleaks](https://github.com/gitleaks/gitleaks#installing), [semgrep](https://semgrep.dev/docs/getting-started/cli), [osv-scanner](https://google.github.io/osv-scanner/installation/). A missing scanner fails the gate; it never silently passes. Automatic fixes cannot edit `.no-mistakes.yaml`, `.github/**`, or `scripts/security/**`. no-mistakes only reads its config from `main`.
+Install the scanners locally: [gitleaks](https://github.com/gitleaks/gitleaks#installing), [semgrep](https://semgrep.dev/docs/getting-started/cli), [osv-scanner](https://google.github.io/osv-scanner/installation/). A missing scanner fails the gate; it never silently passes. Automatic fixes cannot edit `.no-mistakes.yaml`, `.github/**`, `scripts/security/**`, or the scanner ignore files (`.gitleaksignore`, `.gitleaks.toml`, `.semgrepignore`, `osv-scanner.toml`). no-mistakes only reads its config from `main`, and its gates run `main`'s copy of `gate.mjs`, so edits to either take effect after merge; `npm run security` runs your working copy. CI scanner downloads are checksum-verified and actions are pinned to commit SHAs (Dependabot keeps them current). To make CI a real gate, mark the `test`, `secrets`, `sast` and `deps` checks as required for `main` in the repo's branch protection settings.
 
 ## Project structure
 
