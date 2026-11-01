@@ -5,6 +5,10 @@
 # Core pipeline (fixed order): intent -> rebase -> review -> test -> document -> lint -> push -> pr -> ci
 # The security gates below add checks to it; they can never skip or weaken a core step.
 # Scanner logic lives in scripts/security/gate.mjs and is shared with .github/workflows/security.yml.
+#
+# Each gate runs main's copy of gate.mjs (origin/main, which no-mistakes fetches
+# before the run), not the pushed branch's copy, so a branch cannot weaken its
+# own check. Changes to gate.mjs take effect after merge, like this file.
 
 commands:
   prepare: "npm ci --prefer-offline --no-audit --no-fund"
@@ -14,13 +18,17 @@ gates:
   # Secrets run first, before the review agent reads the diff.
   - name: secrets
     after: rebase
-    command: "node scripts/security/gate.mjs secrets"
+    command: 'd=$(mktemp -d) && git show origin/main:scripts/security/gate.mjs > "$d/gate.mjs" && node "$d/gate.mjs" secrets; s=$?; rm -rf "$d"; exit $s'
+  # New nosemgrep / gitleaks:allow comments, scanner ignore files and pipeline edits.
+  - name: suppressions
+    after: rebase
+    command: 'd=$(mktemp -d) && git show origin/main:scripts/security/gate.mjs > "$d/gate.mjs" && node "$d/gate.mjs" suppressions; s=$?; rm -rf "$d"; exit $s'
   - name: sast
     after: review
-    command: "node scripts/security/gate.mjs sast"
+    command: 'd=$(mktemp -d) && git show origin/main:scripts/security/gate.mjs > "$d/gate.mjs" && node "$d/gate.mjs" sast; s=$?; rm -rf "$d"; exit $s'
   - name: deps
     after: test
-    command: "node scripts/security/gate.mjs deps"
+    command: 'd=$(mktemp -d) && git show origin/main:scripts/security/gate.mjs > "$d/gate.mjs" && node "$d/gate.mjs" deps; s=$?; rm -rf "$d"; exit $s'
 
 auto_fix:
   # Review findings wait for your decision (product default).
@@ -32,11 +40,16 @@ auto_fix:
     sast: 1
     deps: 1
 
-# Automatic fixes may not edit the pipeline itself; touching these parks for you.
+# Automatic fixes may not edit the pipeline or its ignore files; touching these parks for you.
 protected_paths:
   - ".no-mistakes.yaml"
   - ".github/**"
   - "scripts/security/**"
+  # Scanner ignore files: an automatic fix must not silence a finding.
+  - ".gitleaksignore"
+  - ".gitleaks.toml"
+  - ".semgrepignore"
+  - "osv-scanner.toml"
 
 ignore_patterns:
   - "docs/verification/**"
