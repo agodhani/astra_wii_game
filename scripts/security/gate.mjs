@@ -204,16 +204,19 @@ function suppressions() {
 
 export function suppressionFindings(diffText) {
   const findings = [];
-  let file = null, line = 0;
+  let file = null, oldFile = null, line = 0;
   for (const text of diffText.split('\n')) {
-    if (text.startsWith('+++ ')) {
+    if (text.startsWith('--- ')) {
+      oldFile = text === '--- /dev/null' ? null : text.slice(6);
+    } else if (text.startsWith('+++ ')) {
       file = text === '+++ /dev/null' ? null : text.slice(6);
-      if (!file) continue;
-      const name = file.split('/').pop();
-      if (SUPPRESSION_FILES.includes(name)) {
+      const name = file?.split('/').pop();
+      // Pipeline files are checked by old path too, so deleting one is caught.
+      const pipeline = [file, oldFile].find(f => f && PIPELINE_PATHS.some(p => p.test(f)));
+      if (file && SUPPRESSION_FILES.includes(name)) {
         findings.push(suppressionFinding(file, undefined, `Changes ${name}, which tells a scanner to skip findings. Confirm each new entry is intended.`));
-      } else if (PIPELINE_PATHS.some(p => p.test(file))) {
-        findings.push(suppressionFinding(file, undefined, 'Changes the security pipeline. Confirm the change is intended; it can weaken or skip checks.'));
+      } else if (pipeline) {
+        findings.push(suppressionFinding(pipeline, undefined, 'Changes the security pipeline. Confirm the change is intended; it can weaken or skip checks.'));
       }
     } else if (text.startsWith('@@ ')) {
       line = Number(/\+(\d+)/.exec(text)?.[1] || 0);

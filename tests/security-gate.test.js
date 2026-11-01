@@ -74,9 +74,10 @@ test('new suppression comments, ignore files and pipeline edits each need a deci
   'diff --git a/.gitleaksignore b/.gitleaksignore', '--- a/.gitleaksignore', '+++ /dev/null', '@@ -1 +0,0 @@', '-abc',
   'diff --git a/scripts/security/gate.mjs b/scripts/security/gate.mjs', '--- a/scripts/security/gate.mjs', '+++ b/scripts/security/gate.mjs',
   '@@ -1 +1 @@', `+// mentions ${NOSEM}`,
+  'diff --git a/.github/workflows/security.yml b/.github/workflows/security.yml', '--- a/.github/workflows/security.yml', '+++ /dev/null', '@@ -1 +0,0 @@', '-name: security',
  ].join('\n');
  const out = suppressionFindings(diff);
- assert.deepEqual(out.map(f => [f.file, f.line]), [['src/a.js', 12], ['src/a.js', 22], ['osv-scanner.toml', undefined], ['scripts/security/gate.mjs', undefined]]);
+ assert.deepEqual(out.map(f => [f.file, f.line]), [['src/a.js', 12], ['src/a.js', 22], ['osv-scanner.toml', undefined], ['scripts/security/gate.mjs', undefined], ['.github/workflows/security.yml', undefined]]);
  assert.ok(out.every(f => f.severity === 'error' && f.action === 'ask-user'));
  assert.deepEqual(suppressionFindings(''), []);
 });
