@@ -1,0 +1,8 @@
+# The security pipeline: changes here can weaken or skip checks.
+/.no-mistakes.yaml @agodhani
+/.github/ @agodhani
+/scripts/security/ @agodhani
+/.gitleaksignore @agodhani
+/.gitleaks.toml @agodhani
+/.semgrepignore @agodhani
+/osv-scanner.toml @agodhani
