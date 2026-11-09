@@ -17,7 +17,7 @@
     "security:suppressions": "node scripts/security/gate.mjs suppressions"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "0.10.32",
+    "@mediapipe/tasks-vision": "1.2.2",
     "peerjs": "^1.5.5",
     "qrcode": "^1.5.4",
     "three": "0.180.0"
